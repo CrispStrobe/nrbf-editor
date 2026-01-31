@@ -4,6 +4,8 @@ A cross-platform tool for viewing, editing, and converting **.NET Binary Format 
 
 This format is commonly used by Unity games and .NET applications for serializing object graphs (esp. Game Save files). This tool allows you to modify primitive values deep within the binary structure without needing the original source code.
 
+Demo: https://nrbfeditor.vercel.app/
+
 This is work in progress, so use after backing up your data only.
 
 ## 🚀 Features
