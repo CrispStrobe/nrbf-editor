@@ -17,6 +17,12 @@ import 'dart:io' as io;
 import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart' as selector;
 
+import 'presets/preset_manager.dart';
+import 'presets/preset_models.dart';
+import 'presets/preset_selector_widget.dart';
+import 'presets/preset_editor_screen.dart';
+import 'diff/diff_screen.dart';
+
 void main() {
   runApp(const NrbfEditorApp());
 }
@@ -162,18 +168,37 @@ class _EditorScreenState extends State<EditorScreen> {
   int _totalRecords = 0;
   Map<String, int> _recordTypeStats = {};
   final Map<String, GlobalKey> _nodeKeys = {};
+  bool _showFavoritesPanel = false;
+  bool _showPresetFieldsPanel = false;
   
   @override
   void initState() {
     super.initState();
     DebugLogger.addListener(_onLogUpdate);
     DebugLogger.log('NRBF Editor initialized', level: LogLevel.info);
+    
+    // Initialize PresetManager
+    PresetManager.instance.initialize().then((_) {
+      DebugLogger.log('PresetManager initialized', level: LogLevel.info);
+      if (mounted) setState(() {});
+    }).catchError((e) {
+      DebugLogger.log('ERROR initializing PresetManager: $e', level: LogLevel.error);
+    });
+    
+    PresetManager.instance.addListener(_onPresetChange);
+  }
+
+  void _onPresetChange() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     DebugLogger.removeListener(_onLogUpdate);
+    PresetManager.instance.removeListener(_onPresetChange);
     super.dispose();
   }
 
@@ -195,80 +220,80 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _pickFile() async {
     try {
-      setState(() {
+        setState(() {
         _isLoading = true;
         _error = null;
-      });
+        });
 
-      DebugLogger.log('=== FILE PICKER INITIATED ===', level: LogLevel.info);
+        DebugLogger.log('=== FILE PICKER INITIATED ===', level: LogLevel.info);
 
-      final result = await FilePicker.platform.pickFiles(
+        final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         withData: true,
-      );
+        );
 
-      if (result == null || result.files.first.bytes == null) {
+        if (result == null || result.files.first.bytes == null) {
         DebugLogger.log('File picker cancelled by user', level: LogLevel.info);
         setState(() => _isLoading = false);
         return;
-      }
+        }
 
-      final bytes = result.files.first.bytes!;
-      final fileName = result.files.first.name;
+        final bytes = result.files.first.bytes!;
+        final fileName = result.files.first.name;
 
-      DebugLogger.log('File selected: $fileName', level: LogLevel.info);
-      DebugLogger.log('File size: ${bytes.length} bytes (${_formatBytes(bytes.length)})', level: LogLevel.info);
+        DebugLogger.log('File selected: $fileName', level: LogLevel.info);
+        DebugLogger.log('File size: ${bytes.length} bytes (${_formatBytes(bytes.length)})', level: LogLevel.info);
 
-      // Validate NRBF header
-      DebugLogger.log('Validating NRBF header...', level: LogLevel.info);
-      if (!NrbfUtils.startsWithPayloadHeader(bytes)) {
+        // Validate NRBF header
+        DebugLogger.log('Validating NRBF header...', level: LogLevel.info);
+        if (!NrbfUtils.startsWithPayloadHeader(bytes)) {
         DebugLogger.log('WARNING: File does not start with valid NRBF header', level: LogLevel.warning);
         
         final shouldContinue = await _showConfirmDialog(
-          'Invalid NRBF Header',
-          'This file does not appear to be a valid NRBF file. Continue anyway?',
+            'Invalid NRBF Header',
+            'This file does not appear to be a valid NRBF file. Continue anyway?',
         );
         
         if (!shouldContinue) {
-          setState(() => _isLoading = false);
-          return;
+            setState(() => _isLoading = false);
+            return;
         }
-      } else {
+        } else {
         DebugLogger.log('✓ Valid NRBF header detected', level: LogLevel.info);
-      }
+        }
 
-      // Show first 64 bytes for debugging
-      final hexDump = _createHexDump(bytes.sublist(0, bytes.length < 64 ? bytes.length : 64));
-      DebugLogger.log('First 64 bytes:\n$hexDump', level: LogLevel.debug);
+        // Show first 64 bytes for debugging
+        final hexDump = _createHexDump(bytes.sublist(0, bytes.length < 64 ? bytes.length : 64));
+        DebugLogger.log('First 64 bytes:\n$hexDump', level: LogLevel.debug);
 
-      DebugLogger.log('=== STARTING NRBF DECODE ===', level: LogLevel.info);
-      
-      final stopwatch = Stopwatch()..start();
-      _decoder = NrbfDecoder(bytes, verbose: _verboseLogging);
-      final root = _decoder!.decode();
-      stopwatch.stop();
+        DebugLogger.log('=== STARTING NRBF DECODE ===', level: LogLevel.info);
+        
+        final stopwatch = Stopwatch()..start();
+        _decoder = NrbfDecoder(bytes, verbose: _verboseLogging);
+        final root = _decoder!.decode();
+        stopwatch.stop();
 
-      DebugLogger.log('=== DECODE COMPLETED ===', level: LogLevel.info);
-      DebugLogger.log('Decode time: ${stopwatch.elapsedMilliseconds}ms', level: LogLevel.info);
-      
-      // Gather statistics
-      final allRecords = _decoder!.getAllRecords();
-      _totalRecords = allRecords.length;
-      _recordTypeStats = _gatherRecordTypeStats(allRecords);
-      
-      DebugLogger.log('Total records decoded: $_totalRecords', level: LogLevel.info);
-      DebugLogger.log('Record type breakdown:', level: LogLevel.info);
-      _recordTypeStats.forEach((type, count) {
+        DebugLogger.log('=== DECODE COMPLETED ===', level: LogLevel.info);
+        DebugLogger.log('Decode time: ${stopwatch.elapsedMilliseconds}ms', level: LogLevel.info);
+        
+        // Gather statistics (DECLARE ONCE, USE TWICE)
+        final allRecords = _decoder!.getAllRecords();
+        _totalRecords = allRecords.length;
+        _recordTypeStats = _gatherRecordTypeStats(allRecords);
+        
+        DebugLogger.log('Total records decoded: $_totalRecords', level: LogLevel.info);
+        DebugLogger.log('Record type breakdown:', level: LogLevel.info);
+        _recordTypeStats.forEach((type, count) {
         DebugLogger.log('  - $type: $count', level: LogLevel.info);
-      });
+        });
 
-      final libraries = _decoder!.getLibraries();
-      DebugLogger.log('Libraries found: ${libraries.length}', level: LogLevel.info);
-      libraries.forEach((id, name) {
+        final libraries = _decoder!.getLibraries();
+        DebugLogger.log('Libraries found: ${libraries.length}', level: LogLevel.info);
+        libraries.forEach((id, name) {
         DebugLogger.log('  - Library $id: $name', level: LogLevel.info);
-      });
+        });
 
-      setState(() {
+        setState(() {
         _fileBytes = bytes;
         _fileName = fileName;
         _nodeKeys.clear();
@@ -276,26 +301,53 @@ class _EditorScreenState extends State<EditorScreen> {
         _isLoading = false;
         _expandedNodes.clear();
         _expandedNodes[''] = true;
-      });
+        });
 
-      DebugLogger.log('✓ File loaded successfully', level: LogLevel.info);
-      
-      // Initial search
-      _performSearch();
+        DebugLogger.log('✓ File loaded successfully', level: LogLevel.info);
 
-      _showSnackBar('File loaded: $_totalRecords records decoded', success: true);
+        // Auto-detect preset (REUSE allRecords and libraries)
+        DebugLogger.log('=== AUTO-DETECTING PRESET ===', level: LogLevel.info);
+        
+        final classNames = <String>[];
+        for (final record in allRecords.values) {
+        if (record is ClassRecord) {
+            if (!classNames.contains(record.typeName)) {
+            classNames.add(record.typeName);
+            }
+        }
+        }
+        
+        final libraryNames = libraries.values.toList();
+        
+        DebugLogger.log('Found ${classNames.length} unique class names', level: LogLevel.debug);
+        DebugLogger.log('Found ${libraryNames.length} libraries', level: LogLevel.debug);
+        
+        final detectedPreset = PresetManager.instance.autoDetectPreset(classNames, libraryNames);
+        if (detectedPreset != null) {
+        PresetManager.instance.setActivePreset(detectedPreset.gameTypeId);
+        DebugLogger.log('✓ Preset auto-detected: ${detectedPreset.displayName}', 
+                        level: LogLevel.info);
+        _showSnackBar('Preset detected: ${detectedPreset.displayName}', success: true);
+        } else {
+        DebugLogger.log('No matching preset found', level: LogLevel.warning);
+        }
+        
+        // Initial search
+        _performSearch();
+
+        _showSnackBar('File loaded: $_totalRecords records decoded', success: true);
     } catch (e, stackTrace) {
-      DebugLogger.log('ERROR loading file: $e', level: LogLevel.error);
-      DebugLogger.log('Stack trace:\n$stackTrace', level: LogLevel.error);
-      
-      setState(() {
+        DebugLogger.log('ERROR loading file: $e', level: LogLevel.error);
+        DebugLogger.log('Stack trace:\n$stackTrace', level: LogLevel.error);
+        
+        setState(() {
         _error = 'Error loading file: $e';
         _isLoading = false;
-      });
+        });
 
-      _showSnackBar('Failed to load file: $e', success: false);
+        _showSnackBar('Failed to load file: $e', success: false);
     }
-  }
+    }
 
   void _performSearch() {
     if (_rootRecord == null) return;
@@ -335,76 +387,76 @@ class _EditorScreenState extends State<EditorScreen> {
     final resolvedNode = _resolveValue(node);
     
     if (resolvedNode is ClassRecord) {
-      // 1. Check Class Name
-      if (resolvedNode.typeName.toLowerCase().contains(query)) {
+        // 1. Check Class Name
+        if (resolvedNode.typeName.toLowerCase().contains(query)) {
         results.add(SearchResult(
-          path: path.isEmpty ? resolvedNode.typeName : '$path.${resolvedNode.typeName}',
-          type: 'Class',
-          value: resolvedNode.typeName,
-          record: resolvedNode,
+            path: path.isEmpty ? resolvedNode.typeName : '$path.${resolvedNode.typeName}',
+            type: 'Class',
+            value: resolvedNode.typeName,
+            record: resolvedNode,
         ));
-      }
+        }
 
-      // 2. Special GUID handling
-      if (resolvedNode.typeName == 'System.Guid') {
-         try {
-          final guidString = ClassRecord.reconstructGuid(resolvedNode);
-          if (guidString.toLowerCase().contains(query)) {
+        // 2. Special GUID handling
+        if (resolvedNode.typeName == 'System.Guid') {
+        try {
+            final guidString = ClassRecord.reconstructGuid(resolvedNode);
+            if (guidString.toLowerCase().contains(query)) {
             results.add(SearchResult(
-              path: path, // GUID is treated as a leaf value for the path
-              type: 'GUID',
-              value: guidString,
-              record: resolvedNode,
+                path: path, // GUID is treated as a leaf value for the path
+                type: 'GUID',
+                value: guidString,
+                record: resolvedNode,
             ));
-          }
+            }
         } catch (e) { /* ignore */ }
-      }
+        }
 
-      // 3. Check Members
-      for (final memberName in resolvedNode.memberNames) {
+        // 3. Check Members
+        for (final memberName in resolvedNode.memberNames) {
         final memberPath = path.isEmpty ? memberName : '$path.$memberName';
         var memberValue = resolvedNode.getValue(memberName);
         memberValue = _resolveValue(memberValue);
 
         // A. Match Member Name
         if (memberName.toLowerCase().contains(query)) {
-          results.add(SearchResult(
+            results.add(SearchResult(
             path: memberPath,
             type: 'Field',
             value: _formatValue(memberValue),
             record: resolvedNode,
-          ));
+            ));
         }
 
         // B. Match Member Value (String/Primitive)
         if (memberValue != null) {
-          final valueStr = _formatValue(memberValue).toLowerCase();
-          if (valueStr.contains(query)) {
+            final valueStr = _formatValue(memberValue).toLowerCase();
+            if (valueStr.contains(query)) {
             results.add(SearchResult(
-              path: memberPath,
-              type: 'Value',
-              value: _formatValue(memberValue),
-              record: resolvedNode,
+                path: memberPath,
+                type: 'Value',
+                value: _formatValue(memberValue),
+                record: resolvedNode,
             ));
-          }
+            }
 
-          // C. Recurse (Deep Search)
-          if (memberValue is NrbfRecord && 
-              memberValue is! MemberReferenceRecord &&
-              (memberValue is! ClassRecord || memberValue.typeName != 'System.Guid')) {
+            // C. Recurse (Deep Search)
+            if (memberValue is NrbfRecord && 
+                memberValue is! MemberReferenceRecord &&
+                (memberValue is! ClassRecord || memberValue.typeName != 'System.Guid')) {
             _searchNode(memberValue, memberPath, results, query);
-          }
+            }
         }
-      }
+        }
     } 
-    // 4. Handle Arrays (FIXED: Added recursion logic here)
+    // 4. Handle Arrays
     else if (resolvedNode is BinaryArrayRecord ||
         resolvedNode is ArraySinglePrimitiveRecord ||
         resolvedNode is ArraySingleObjectRecord ||
         resolvedNode is ArraySingleStringRecord) {
-      
-      final array = (resolvedNode as dynamic).getArray() as List;
-      for (int i = 0; i < array.length; i++) {
+        
+        final array = (resolvedNode as dynamic).getArray() as List;
+        for (int i = 0; i < array.length; i++) {
         var element = array[i];
         element = _resolveValue(element);
         final elementPath = '$path[$i]';
@@ -412,21 +464,21 @@ class _EditorScreenState extends State<EditorScreen> {
         // Check content of primitives inside array
         final valStr = _formatValue(element).toLowerCase();
         if (valStr.contains(query)) {
-           results.add(SearchResult(
+            results.add(SearchResult(
             path: elementPath,
             type: 'ArrayItem',
             value: _formatValue(element),
             record: resolvedNode,
-          ));
+            ));
         }
 
         // Recurse if complex object
         if (element is NrbfRecord && element is! MemberReferenceRecord) {
-          _searchNode(element, elementPath, results, query);
+            _searchNode(element, elementPath, results, query);
         }
-      }
+        }
     }
-  }
+    }
 
   String _formatValue(dynamic value) {
     // Try to resolve references first
@@ -894,6 +946,36 @@ class _EditorScreenState extends State<EditorScreen> {
                                         child: _buildTreeView(),
                                       ),
 
+                                      // Preset Fields panel (ADD THIS)
+                                      if (_showPresetFieldsPanel && 
+                                          PresetManager.instance.hasActivePreset)
+                                        Container(
+                                          width: 300,
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              left: BorderSide(
+                                                color: Theme.of(context).dividerColor,
+                                              ),
+                                            ),
+                                          ),
+                                          child: _buildPresetFieldsPanel(),
+                                        ),
+
+                                      // Favorites panel
+                                      if (_showFavoritesPanel && 
+                                          PresetManager.instance.hasActivePreset)
+                                        Container(
+                                          width: 300,
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              left: BorderSide(
+                                                color: Theme.of(context).dividerColor,
+                                              ),
+                                            ),
+                                          ),
+                                          child: _buildFavoritesPanel(),
+                                        ),
+
                                       // Search results
                                       if (_searchResults.isNotEmpty)
                                         Container(
@@ -963,7 +1045,113 @@ class _EditorScreenState extends State<EditorScreen> {
               label: const Text('Export JSON'),
             ),
             const SizedBox(width: 16),
+            
+            // Preset selector dropdown
+            PopupMenuButton<String>(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.games),
+                    const SizedBox(width: 8),
+                    Text(PresetManager.instance.activePreset?.displayName ?? 
+                         'No preset'),
+                    const Icon(Icons.arrow_drop_down),
+                  ],
+                ),
+              ),
+              onSelected: (gameTypeId) {
+                if (gameTypeId.isEmpty) {
+                  PresetManager.instance.setActivePreset(null);
+                } else {
+                  PresetManager.instance.setActivePreset(gameTypeId);
+                }
+                setState(() {});
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: '',
+                  child: Row(
+                    children: [
+                      Icon(Icons.clear),
+                      SizedBox(width: 8),
+                      Text('No preset'),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                ...PresetManager.instance.presets.map((preset) {
+                  return PopupMenuItem(
+                    value: preset.gameTypeId,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.games,
+                          color: PresetManager.instance.activePreset?.gameTypeId == 
+                                 preset.gameTypeId
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(preset.displayName),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+            const SizedBox(width: 8),
+            
+            // Favorites toggle
+            IconButton(
+              icon: Icon(_showFavoritesPanel ? Icons.star : Icons.star_border),
+              tooltip: _showFavoritesPanel ? 'Hide favorites' : 'Show favorites',
+              onPressed: PresetManager.instance.hasActivePreset
+                  ? () => setState(() => _showFavoritesPanel = !_showFavoritesPanel)
+                  : null,
+            ),
+
+            // Preset fields toggle
+            IconButton(
+              icon: Icon(_showPresetFieldsPanel ? Icons.playlist_play : Icons.playlist_play_outlined),
+              tooltip: _showPresetFieldsPanel ? 'Hide preset fields' : 'Show preset fields',
+              onPressed: PresetManager.instance.hasActivePreset
+                  ? () => setState(() => _showPresetFieldsPanel = !_showPresetFieldsPanel)
+                  : null,
+            ),
+            
+            // Preset editor
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: 'Preset Editor',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PresetEditorScreen(),
+                  ),
+                );
+              },
+            ),
+
+            IconButton(
+              icon: const Icon(Icons.compare_arrows),
+              tooltip: 'Compare Files',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DiffScreen(),
+                  ),
+                );
+              },
+            ),
+            
+            const SizedBox(width: 16),
           ],
+
+          
 
           // Search
           if (_rootRecord != null) ...[
@@ -1022,7 +1210,7 @@ class _EditorScreenState extends State<EditorScreen> {
     // RESOLVE REFERENCE
     final resolvedNode = _resolveValue(node);
     
-    // FIX: Do not rename empty path to 'root'. Use path as-is.
+    // We do not rename empty path to 'root' but use path as-is.
     // The UI builder uses '' for the root key, so we must use '' here too.
     _expandedNodes[path] = true;
 
@@ -1242,42 +1430,86 @@ class _EditorScreenState extends State<EditorScreen> {
     
     // If it's a nested ClassRecord, show field name + class
     if (value is ClassRecord) {
-      final nodePath = path;
-      final isExpanded = _expandedNodes[nodePath] ?? false;
-      final matchesSearch = _searchQuery.isNotEmpty &&
-          (memberName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              value.typeName.toLowerCase().contains(_searchQuery.toLowerCase()));
+    final nodePath = path;
+    final isExpanded = _expandedNodes[nodePath] ?? false;
+    final matchesSearch = _searchQuery.isNotEmpty &&
+        (memberName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            value.typeName.toLowerCase().contains(_searchQuery.toLowerCase()));
 
-      // Special handling for System.Guid - show inline
-      if (value.typeName == 'System.Guid') {
-        try {
-          final guidString = ClassRecord.reconstructGuid(value);
-          return Container(
-            key: key,
-            margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
-            decoration: BoxDecoration(
-              color: matchesSearch
-                  ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2)
-                  : null,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ListTile(
-              leading: const Icon(Icons.fingerprint, size: 20),
-              title: Text(memberName),
-              subtitle: Text(guidString),
-              trailing: IconButton(
-                icon: const Icon(Icons.copy, size: 20),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: guidString));
-                  _showSnackBar('GUID copied to clipboard', success: true);
-                },
-              ),
-            ),
-          );
-        } catch (e) {
-          // Fall through to normal handling
-        }
+    // Special handling for System.Guid - CHECK FOR PRESET FIRST!
+    if (value.typeName == 'System.Guid') {
+      // Check if there's a preset for this path
+      final fieldPreset = PresetManager.instance.findPresetForPath(path);
+      
+      if (fieldPreset != null) {
+        // Use PresetSelectorWidget
+        DebugLogger.log('Using preset selector for GUID at path: $path', level: LogLevel.debug);
+        return PresetSelectorWidget(
+          key: key,
+          parentRecord: parentRecord,
+          memberName: memberName,
+          currentValue: value,
+          fieldPreset: fieldPreset,
+          path: path,
+          onValueChanged: (newValue) {
+            try {
+              applyGuidToRecord(value, newValue);
+              setState(() {});
+              _showSnackBar('GUID updated', success: true);
+            } catch (e) {
+              _showSnackBar('Error updating GUID: $e', success: false);
+            }
+          },
+        );
       }
+      
+      // Default GUID display (no preset found)
+      try {
+        final guidString = ClassRecord.reconstructGuid(value);
+        return Container(
+          key: key,
+          margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
+          decoration: BoxDecoration(
+            color: matchesSearch
+                ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2)
+                : null,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ListTile(
+            leading: const Icon(Icons.fingerprint, size: 20),
+            title: Row(
+              children: [
+                Expanded(child: Text(memberName)),
+                FavoriteToggle(path: path),
+              ],
+            ),
+            subtitle: Text(guidString),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ADD EDIT BUTTON
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => _showGuidEditDialog(value, memberName, guidString),
+                  tooltip: 'Edit GUID',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 20),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: guidString));
+                    _showSnackBar('GUID copied to clipboard', success: true);
+                  },
+                  tooltip: 'Copy GUID',
+                ),
+              ],
+            ),
+          ),
+        );
+      } catch (e) {
+        // Fall through to normal handling
+      }
+
+    } // if System.Guid
 
       // For other ClassRecords, show as expandable with field name
       return Card(
@@ -1351,6 +1583,76 @@ class _EditorScreenState extends State<EditorScreen> {
     return _buildEditableField(parentRecord, memberName, value, path, depth);
   }
 
+  void _showGuidEditDialog(ClassRecord guidRecord, String fieldName, String currentGuid) {
+    final controller = TextEditingController(text: currentGuid);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit $fieldName'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter GUID value:',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'GUID',
+                hintText: currentGuid,
+                border: const OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final newGuid = controller.text.trim();
+              
+              // Validate GUID format
+              final guidPattern = RegExp(
+                r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                caseSensitive: false,
+              );
+              
+              if (!guidPattern.hasMatch(newGuid)) {
+                _showSnackBar('Invalid GUID format', success: false);
+                return;
+              }
+              
+              try {
+                applyGuidToRecord(guidRecord, newGuid);
+                setState(() {});
+                Navigator.pop(context);
+                _showSnackBar('GUID updated successfully', success: true);
+              } catch (e) {
+                _showSnackBar('Error updating GUID: $e', success: false);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Build array member field with field name preserved
   Widget _buildArrayMemberField(String memberName, dynamic arrayRecord, String path, int depth) {
     final nodePath = path;
@@ -1408,7 +1710,48 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Widget _buildEditableField(ClassRecord record, String memberName, dynamic value, String path, int depth) {
-    // Generate or retrieve a key for this specific path
+    // Check if there's a preset for this path
+    final fieldPreset = PresetManager.instance.findPresetForPath(path);
+    
+    if (fieldPreset != null && _canEdit(value)) {
+      // Use PresetSelectorWidget
+      return PresetSelectorWidget(
+        parentRecord: record,
+        memberName: memberName,
+        currentValue: value,
+        fieldPreset: fieldPreset,
+        path: path,
+        onValueChanged: (newValue) {
+          try {
+            // Parse the value according to type
+            dynamic parsedValue;
+            switch (fieldPreset.valueType) {
+              case PresetValueType.intValue:
+                parsedValue = int.parse(newValue);
+                break;
+              case PresetValueType.floatValue:
+                parsedValue = double.parse(newValue);
+                break;
+              case PresetValueType.string:
+                parsedValue = newValue;
+                break;
+              case PresetValueType.guid:
+                // This shouldn't happen here (GUIDs handled separately)
+                parsedValue = newValue;
+                break;
+            }
+            
+            record.setValue(memberName, parsedValue);
+            setState(() {});
+            _showSnackBar('Value updated', success: true);
+          } catch (e) {
+            _showSnackBar('Error updating value: $e', success: false);
+          }
+        },
+      );
+    }
+    
+    // Default editable field (existing code)
     final key = _nodeKeys.putIfAbsent(path, () => GlobalKey());
     final matchesSearch = _searchQuery.isNotEmpty &&
         (memberName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -1425,7 +1768,13 @@ class _EditorScreenState extends State<EditorScreen> {
       ),
       child: ListTile(
         leading: _getValueIcon(value),
-        title: Text(memberName),
+        title: Row(
+          children: [
+            Expanded(child: Text(memberName)),
+            if (PresetManager.instance.hasActivePreset)
+              FavoriteToggle(path: path),
+          ],
+        ),
         subtitle: Text(_formatValue(value)),
         trailing: _canEdit(value)
             ? IconButton(
@@ -1669,6 +2018,217 @@ class _EditorScreenState extends State<EditorScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildFavoritesPanel() {
+    final favorites = PresetManager.instance.activePreset?.favorites ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceVariant,
+            border: Border(
+              bottom: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.star, color: Colors.amber),
+              const SizedBox(width: 8),
+              Text(
+                'Favorites (${favorites.length})',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: favorites.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.star_border,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No favorites yet',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Click ★ on any field',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: favorites.length,
+                  itemBuilder: (context, index) {
+                    final favorite = favorites[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.star, color: Colors.amber, size: 20),
+                        title: Text(favorite.label),
+                        subtitle: Text(
+                          favorite.path,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            PresetManager.instance.toggleFavorite(favorite.path);
+                            PresetManager.instance.saveCurrentPreset();
+                          },
+                        ),
+                        onTap: () {
+                          // Jump to this path using existing search result logic
+                          final fakeResult = SearchResult(
+                            path: favorite.path,
+                            type: 'Favorite',
+                            value: favorite.label,
+                            record: _rootRecord!,
+                          );
+                          _jumpToResult(fakeResult);
+                        },
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPresetFieldsPanel() {
+    final fieldPresets = PresetManager.instance.activePreset?.fieldPresets ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceVariant,
+            border: Border(
+              bottom: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.playlist_play),
+              const SizedBox(width: 8),
+              Text(
+                'Preset Fields (${fieldPresets.length})',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: fieldPresets.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.playlist_add,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No preset fields',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Add fields in Preset Editor',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: fieldPresets.length,
+                  itemBuilder: (context, index) {
+                    final fieldPreset = fieldPresets[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ExpansionTile(
+                        leading: const Icon(Icons.playlist_play, size: 20),
+                        title: Text(fieldPreset.displayName),
+                        subtitle: Text(
+                          '${fieldPreset.pathPattern} (${fieldPreset.matchMode.name})\n'
+                          '${fieldPreset.entries.length} options',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Search for fields matching this preset:',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                const SizedBox(height: 8),
+                                FilledButton.icon(
+                                  onPressed: () => _searchForPresetFields(fieldPreset),
+                                  icon: const Icon(Icons.search),
+                                  label: const Text('Find All Matches'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  void _searchForPresetFields(FieldPreset fieldPreset) {
+    // Search the entire tree for paths that match this preset
+    DebugLogger.log('Searching for fields matching preset: ${fieldPreset.displayName}',
+        level: LogLevel.info);
+    
+    setState(() {
+      _searchQuery = fieldPreset.pathPattern;
+      _searchController.text = fieldPreset.pathPattern;
+    });
+    
+    _performSearch();
+    
+    _showSnackBar('Found ${_searchResults.length} matches for ${fieldPreset.displayName}',
+        success: true);
   }
 
   void _jumpToResult(SearchResult result) {

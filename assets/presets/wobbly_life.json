@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "gameTypeId": "wobbly_life",
+  "displayName": "Wobbly Life",
+  "detectionHints": [
+    {
+      "classNameFragments": ["Wobbly"]
+    }
+  ],
+  "fieldPresets": [
+    {
+      "id": "vehicle_id",
+      "displayName": "Vehicle ID",
+      "pathPattern": "VehicleID",
+      "matchMode": "fieldName",
+      "valueType": "guid",
+      "entries": [
+        {
+          "id": "vehicle_0",
+          "value": "037b1f7c-871e-4c44-8c0f-451bb24805ac",
+          "displayName": "Unknown Vehicle #0",
+          "tags": []
+        },
+        {
+          "id": "vehicle_1",
+          "value": "522911f7-18ab-40c2-a749-1332e9aa7b96",
+          "displayName": "Unknown Vehicle #1",
+          "tags": []
+        },
+        {
+          "id": "vehicle_2",
+          "value": "11102a69-84bb-4f93-8a59-7cbc734149df",
+          "displayName": "Unknown Vehicle #2",
+          "tags": []
+        },
+        {
+          "id": "vehicle_3",
+          "value": "1a99de91-2598-4876-bb2a-a83ac62981f4",
+          "displayName": "Unknown Vehicle #3",
+          "tags": []
+        },
+        {
+          "id": "vehicle_4",
+          "value": "0a152a85-fe60-41a4-a660-4d5a927172d1",
+          "displayName": "Unknown Vehicle #4",
+          "tags": []
+        },
+        {
+          "id": "vehicle_5",
+          "value": "f0f17d03-ac72-47df-9b05-4cc5536d9438",
+          "displayName": "Unknown Vehicle #5",
+          "tags": []
+        },
+        {
+          "id": "vehicle_6",
+          "value": "384634ce-ca97-493c-834e-b715b20bb063",
+          "displayName": "Unknown Vehicle #6",
+          "tags": []
+        },
+        {
+          "id": "vehicle_7",
+          "value": "7b5a2e37-13d7-4e65-9d03-6aa2cf70e5b7",
+          "displayName": "Unknown Vehicle #7",
+          "tags": []
+        },
+        {
+          "id": "vehicle_8",
+          "value": "b5a3d5e9-a896-4107-92b6-7fa6d2aefb57",
+          "displayName": "Unknown Vehicle #8",
+          "tags": []
+        },
+        {
+          "id": "vehicle_9",
+          "value": "5d66f558-25be-484d-b2fa-b5dc92f0d737",
+          "displayName": "Unknown Vehicle #9",
+          "tags": []
+        },
+        {
+          "id": "vehicle_10",
+          "value": "f3361c68-c10f-4fd8-9658-21b9132966be",
+          "displayName": "Unknown Vehicle #10",
+          "tags": []
+        },
+        {
+          "id": "vehicle_11",
+          "value": "aa6f341c-8161-4231-8ae7-00bc0452a45d",
+          "displayName": "Unknown Vehicle #11",
+          "tags": []
+        },
+        {
+          "id": "vehicle_12",
+          "value": "b34ad83a-d850-4e63-a1ad-cd98e4e3f710",
+          "displayName": "Unknown Vehicle #12",
+          "tags": []
+        },
+        {
+          "id": "vehicle_13",
+          "value": "21894030-9076-4f1b-a972-1a48ee2b8981",
+          "displayName": "Unknown Vehicle #13",
+          "tags": []
+        },
+        {
+          "id": "vehicle_14",
+          "value": "bcf890ba-bf13-48ef-a338-a0bc41f5e876",
+          "displayName": "Unknown Vehicle #14",
+          "tags": []
+        },
+        {
+          "id": "vehicle_15",
+          "value": "d4c82c66-267d-4d0a-aba0-9d244d47b896",
+          "displayName": "Unknown Vehicle #15",
+          "tags": []
+        },
+        {
+          "id": "vehicle_16",
+          "value": "023fb82b-650d-47b6-bfcf-79083aaecd15",
+          "displayName": "Unknown Vehicle #16",
+          "tags": []
+        },
+        {
+          "id": "vehicle_17",
+          "value": "60d15c00-bc1a-44ca-8e22-cbbf25e07a86",
+          "displayName": "Unknown Vehicle #17",
+          "tags": []
+        },
+        {
+          "id": "vehicle_18",
+          "value": "8f90482c-8f59-4131-a7c0-473e1e064dbf",
+          "displayName": "Unknown Vehicle #18",
+          "tags": []
+        },
+        {
+          "id": "vehicle_19",
+          "value": "ae02ccd8-397e-41cc-8f3f-6aa49ab44240",
+          "displayName": "Unknown Vehicle #19",
+          "tags": []
+        },
+        {
+          "id": "vehicle_20",
+          "value": "8da0599e-1e6f-4ce5-9ef3-7824bbb372dc",
+          "displayName": "Unknown Vehicle #20",
+          "tags": []
+        },
+        {
+          "id": "vehicle_21",
+          "value": "eccad1f5-dcf1-445f-8432-2a177628e547",
+          "displayName": "Unknown Vehicle #21",
+          "tags": []
+        },
+        {
+          "id": "vehicle_22",
+          "value": "31837b64-867d-4f61-b6eb-0a55d591c38c",
+          "displayName": "Unknown Vehicle #22",
+          "tags": []
+        },
+        {
+          "id": "vehicle_23",
+          "value": "fdebe3ba-eebb-4177-a32c-91de370c458c",
+          "displayName": "Unknown Vehicle #23",
+          "tags": []
+        },
+        {
+          "id": "vehicle_24",
+          "value": "33925ed3-f213-4d67-9f8e-956f3d2654b4",
+          "displayName": "Unknown Vehicle #24",
+          "tags": []
+        },
+        {
+          "id": "vehicle_25",
+          "value": "19bf8e6a-27f9-4db9-9706-1b603438d28d",
+          "displayName": "Unknown Vehicle #25",
+          "tags": []
+        },
+        {
+          "id": "vehicle_26",
+          "value": "ec5132d3-67d1-4082-8ca6-c4792c44fcc2",
+          "displayName": "Unknown Vehicle #26",
+          "tags": []
+        },
+        {
+          "id": "vehicle_27",
+          "value": "93b32745-83d3-4286-955e-2f720330ac14",
+          "displayName": "Unknown Vehicle #27",
+          "tags": []
+        },
+        {
+          "id": "vehicle_28",
+          "value": "c2cbe48b-4012-4637-b5ce-ea9ea098ce44",
+          "displayName": "Unknown Vehicle #28",
+          "tags": []
+        },
+        {
+          "id": "vehicle_29",
+          "value": "727df864-b5c2-4c6c-acfb-9ad70d00bc9c",
+          "displayName": "Unknown Vehicle #29",
+          "tags": []
+        },
+        {
+          "id": "vehicle_30",
+          "value": "8825c38a-848c-4773-81c6-ba9353b936e4",
+          "displayName": "Unknown Vehicle #30",
+          "tags": []
+        },
+        {
+          "id": "vehicle_31",
+          "value": "94717923-61cd-411a-8118-7f9e3b661db6",
+          "displayName": "Unknown Vehicle #31",
+          "tags": []
+        },
+        {
+          "id": "vehicle_32",
+          "value": "6946f2c9-f3e6-469d-a816-2d2783c2d5d2",
+          "displayName": "Unknown Vehicle #32",
+          "tags": []
+        },
+        {
+          "id": "vehicle_33",
+          "value": "c0ad660b-4ad6-4ddd-9ab2-dabad7b23622",
+          "displayName": "Unknown Vehicle #33",
+          "tags": []
+        },
+        {
+          "id": "vehicle_34",
+          "value": "0e5adf87-1ca6-4c9b-96e0-b029d5b2e273",
+          "displayName": "Unknown Vehicle #34",
+          "tags": []
+        },
+        {
+          "id": "vehicle_35",
+          "value": "0d6fbaa9-e5f8-4cd4-bcb9-20dc7ef5af47",
+          "displayName": "Unknown Vehicle #35",
+          "tags": []
+        },
+        {
+          "id": "vehicle_36",
+          "value": "c50add0e-061e-4792-a179-6a993706067c",
+          "displayName": "Unknown Vehicle #36",
+          "tags": []
+        },
+        {
+          "id": "vehicle_37",
+          "value": "2f1c9ed6-c4e1-4c68-8b89-5b094795842c",
+          "displayName": "Unknown Vehicle #37",
+          "tags": []
+        },
+        {
+          "id": "vehicle_38",
+          "value": "61a20424-f196-46e9-9627-e109bc1cc0db",
+          "displayName": "Unknown Vehicle #38",
+          "tags": []
+        },
+        {
+          "id": "vehicle_39",
+          "value": "b005ae08-a9a1-441c-955d-183edba2e5f2",
+          "displayName": "Unknown Vehicle #39",
+          "tags": []
+        },
+        {
+          "id": "vehicle_40",
+          "value": "d9b183f4-174b-4e78-a550-3b410981fe1f",
+          "displayName": "Unknown Vehicle #40",
+          "tags": []
+        },
+        {
+          "id": "vehicle_41",
+          "value": "35a8d4fd-fd4f-4604-a8b5-1a32004778e4",
+          "displayName": "Unknown Vehicle #41",
+          "tags": []
+        },
+        {
+          "id": "vehicle_42",
+          "value": "eb00c0e0-27d0-44e1-80d9-677f4a6bae12",
+          "displayName": "Unknown Vehicle #42",
+          "tags": []
+        },
+        {
+          "id": "vehicle_43",
+          "value": "0530d82c-0b9e-41c2-859f-d7313cafbb3d",
+          "displayName": "Unknown Vehicle #43",
+          "tags": []
+        }
+      ]
+    }
+  ],
+  "favorites": []
+}
