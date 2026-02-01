@@ -28,6 +28,8 @@ class _DiffScreenState extends State<DiffScreen> {
   String? _afterFileName;
   NrbfRecord? _beforeRecord;
   NrbfRecord? _afterRecord;
+  NrbfDecoder? _beforeDecoder;
+  NrbfDecoder? _afterDecoder; 
   DiffResult? _diffResult;
   bool _isLoading = false;
   String? _error;
@@ -63,10 +65,12 @@ class _DiffScreenState extends State<DiffScreen> {
           _beforeBytes = bytes;
           _beforeFileName = fileName;
           _beforeRecord = record;
+          _beforeDecoder = decoder;
         } else {
           _afterBytes = bytes;
           _afterFileName = fileName;
           _afterRecord = record;
+          _afterDecoder = decoder;
         }
         _isLoading = false;
         _error = null;
@@ -94,7 +98,14 @@ class _DiffScreenState extends State<DiffScreen> {
 
     try {
       DebugLogger.log('Running comparison...', level: LogLevel.info);
-      final result = DiffEngine.compare(_beforeRecord!, _afterRecord!);
+      
+      // Pass decoders for reference resolution
+      final result = DiffEngine.compare(
+        _beforeRecord!,
+        _afterRecord!,
+        beforeDecoder: _beforeDecoder,
+        afterDecoder: _afterDecoder,
+      );
 
       setState(() {
         _diffResult = result;

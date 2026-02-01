@@ -8,13 +8,25 @@ import 'diff_models.dart';
 // ============================================================================
 
 class DiffEngine {
-  static DiffResult compare(NrbfRecord before, NrbfRecord after) {
+  static NrbfDecoder? _beforeDecoder;
+  static NrbfDecoder? _afterDecoder;
+
+  static DiffResult compare(
+    NrbfRecord before,
+    NrbfRecord after, {
+    NrbfDecoder? beforeDecoder,
+    NrbfDecoder? afterDecoder,
+  }) {
     DebugLogger.log('=== STARTING DIFF COMPARISON ===', level: LogLevel.info);
+
+    // Store decoders for reference resolution
+    _beforeDecoder = beforeDecoder;
+    _afterDecoder = afterDecoder;
 
     final changes = <FieldChange>[];
     int fieldsCompared = 0;
 
-    _compareRecords(before, after, '', changes, (count) => fieldsCompared = count);
+    _compareRecords(before, after, '', changes, (count) => fieldsCompared += count);
 
     DebugLogger.log('=== DIFF COMPLETE ===', level: LogLevel.info);
     DebugLogger.log('Total fields compared: $fieldsCompared', level: LogLevel.info);
@@ -26,10 +38,32 @@ class DiffEngine {
     DebugLogger.log('  Removed: ${changes.where((c) => c.changeType == ChangeType.removed).length}',
         level: LogLevel.debug);
 
+    // Clear decoders
+    _beforeDecoder = null;
+    _afterDecoder = null;
+
     return DiffResult(
       changes: changes,
       totalFieldsCompared: fieldsCompared,
     );
+  }
+
+  // RESOLVE REFERENCES
+  static dynamic _resolveValue(dynamic value, bool isBefore) {
+    if (value is MemberReferenceRecord) {
+      final decoder = isBefore ? _beforeDecoder : _afterDecoder;
+      if (decoder != null) {
+        final resolved = decoder.getRecord(value.idRef);
+        if (resolved != null) {
+          DebugLogger.log(
+            'Resolved reference ${value.idRef} to ${resolved.runtimeType}',
+            level: LogLevel.debug,
+          );
+          return resolved;
+        }
+      }
+    }
+    return value;
   }
 
   static void _compareRecords(
@@ -39,6 +73,10 @@ class DiffEngine {
     List<FieldChange> changes,
     Function(int) updateCount,
   ) {
+    // RESOLVE REFERENCES FIRST
+    before = _resolveValue(before, true);
+    after = _resolveValue(after, false);
+
     int count = 0;
 
     if (before is ClassRecord && after is ClassRecord) {
@@ -88,26 +126,34 @@ class DiffEngine {
       return;
     }
 
+    DebugLogger.log('Comparing ClassRecord: ${before.typeName} at path: $path',
+        level: LogLevel.debug);
+
     // Special handling for System.Guid
     if (before.typeName == 'System.Guid' && after.typeName == 'System.Guid') {
       count++;
-      final beforeGuid = ClassRecord.reconstructGuid(before);
-      final afterGuid = ClassRecord.reconstructGuid(after);
+      try {
+        final beforeGuid = ClassRecord.reconstructGuid(before);
+        final afterGuid = ClassRecord.reconstructGuid(after);
 
-      if (beforeGuid != afterGuid) {
-        final fieldName = path.split('.').last;
-        changes.add(FieldChange(
-          path: path,
-          changeType: ChangeType.modified,
-          oldValue: beforeGuid,
-          newValue: afterGuid,
-          oldRawValue: before,
-          newRawValue: after,
-          fieldName: fieldName,
-        ));
+        if (beforeGuid != afterGuid) {
+          final fieldName = path.split('.').last;
+          changes.add(FieldChange(
+            path: path,
+            changeType: ChangeType.modified,
+            oldValue: beforeGuid,
+            newValue: afterGuid,
+            oldRawValue: before,
+            newRawValue: after,
+            fieldName: fieldName,
+          ));
 
-        DebugLogger.log('GUID CHANGE: $path: $beforeGuid → $afterGuid',
-            level: LogLevel.debug);
+          DebugLogger.log('GUID CHANGE: $path: $beforeGuid → $afterGuid',
+              level: LogLevel.debug);
+        }
+      } catch (e) {
+        DebugLogger.log('Error comparing GUIDs at $path: $e',
+            level: LogLevel.warning);
       }
 
       updateCount(count);
@@ -120,10 +166,17 @@ class DiffEngine {
       ...after.memberNames,
     };
 
+    DebugLogger.log('  Members to compare: ${allMembers.length}',
+        level: LogLevel.debug);
+
     for (final memberName in allMembers) {
       final memberPath = path.isEmpty ? memberName : '$path.$memberName';
-      final beforeValue = before.getValue(memberName);
-      final afterValue = after.getValue(memberName);
+      var beforeValue = before.getValue(memberName);
+      var afterValue = after.getValue(memberName);
+
+      // RESOLVE REFERENCES
+      beforeValue = _resolveValue(beforeValue, true);
+      afterValue = _resolveValue(afterValue, false);
 
       if (beforeValue == null && afterValue != null) {
         // Added
@@ -135,6 +188,8 @@ class DiffEngine {
           fieldName: memberName,
         ));
         count++;
+        DebugLogger.log('ADDED: $memberPath = ${_formatValue(afterValue)}',
+            level: LogLevel.debug);
       } else if (beforeValue != null && afterValue == null) {
         // Removed
         changes.add(FieldChange(
@@ -145,6 +200,8 @@ class DiffEngine {
           fieldName: memberName,
         ));
         count++;
+        DebugLogger.log('REMOVED: $memberPath = ${_formatValue(beforeValue)}',
+            level: LogLevel.debug);
       } else if (beforeValue != null && afterValue != null) {
         // Compare recursively
         _compareRecords(beforeValue, afterValue, memberPath, changes, (c) => count += c);
@@ -166,6 +223,9 @@ class DiffEngine {
     final beforeArray = (before as dynamic).getArray() as List;
     final afterArray = (after as dynamic).getArray() as List;
 
+    DebugLogger.log('Comparing arrays at $path: ${beforeArray.length} vs ${afterArray.length} items',
+        level: LogLevel.debug);
+
     final maxLength = beforeArray.length > afterArray.length
         ? beforeArray.length
         : afterArray.length;
@@ -175,26 +235,28 @@ class DiffEngine {
 
       if (i >= beforeArray.length) {
         // Added
+        var afterElement = _resolveValue(afterArray[i], false);
         changes.add(FieldChange(
           path: elementPath,
           changeType: ChangeType.added,
-          newValue: _formatValue(afterArray[i]),
-          newRawValue: afterArray[i],
+          newValue: _formatValue(afterElement),
+          newRawValue: afterElement,
           fieldName: '[$i]',
         ));
         count++;
       } else if (i >= afterArray.length) {
         // Removed
+        var beforeElement = _resolveValue(beforeArray[i], true);
         changes.add(FieldChange(
           path: elementPath,
           changeType: ChangeType.removed,
-          oldValue: _formatValue(beforeArray[i]),
-          oldRawValue: beforeArray[i],
+          oldValue: _formatValue(beforeElement),
+          oldRawValue: beforeElement,
           fieldName: '[$i]',
         ));
         count++;
       } else {
-        // Compare elements
+        // Compare elements (they get resolved in _compareRecords)
         _compareRecords(
             beforeArray[i], afterArray[i], elementPath, changes, (c) => count += c);
       }
