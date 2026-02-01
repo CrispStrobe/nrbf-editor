@@ -43,7 +43,7 @@ A powerful cross-platform tool for viewing, editing, comparing, and managing **.
   - Native: Stored in app support directory
   - Web: In-memory storage with import/export
 - **Detection Hints:** Configure auto-detection based on class/library name fragments
-- **Bundled Presets:** Ships with Wobbly Life vehicle preset (44 vehicles)
+- **Bundled Presets:** Ships with an example of Wobbly Life vehicle presets (44 vehicles)
 
 ### ⭐ Favorites & Quick Access
 - **Favorites Panel:** Bookmark frequently accessed fields with custom labels
@@ -194,7 +194,7 @@ A powerful cross-platform tool for viewing, editing, comparing, and managing **.
 
 ## 🎮 Supported Games
 
-### Officially Supported (with bundled presets)
+### Example bundled presets
 - **Wobbly Life** - Vehicle IDs (44 vehicles)
 
 ### Compatible (manual preset creation needed)
