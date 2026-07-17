@@ -1,7 +1,6 @@
 // lib/nrbf/nrbf.dart
 import 'dart:typed_data';
 import 'dart:convert';
-import 'dart:math';
 import 'dart:developer' as developer;
 
 // ============================================================================
@@ -761,7 +760,6 @@ class NrbfDecoder {
   void _log(String message) {
     if (verbose) {
       developer.log('[NRBF] $message', name: 'NrbfDecoder');
-      print('[NRBF] $message');
     }
   }
 
@@ -830,21 +828,6 @@ class NrbfDecoder {
   List<NrbfRecord> getAllRecordsInOrder() => _allRecordsInOrder;
 
   // Resolve references during member reading
-  dynamic _resolveMemberValue(dynamic value) {
-    if (value is MemberReferenceRecord) {
-      final resolved = _recordMap[value.idRef];
-      if (resolved != null) {
-        _log(
-            '      -> Resolved reference ${value.idRef} to ${resolved.runtimeType}');
-        return resolved;
-      } else {
-        _log('      -> WARNING: Could not resolve reference ${value.idRef}');
-        return value; // Return the reference if we can't resolve it
-      }
-    }
-    return value;
-  }
-
   NrbfRecord _decodeNext() {
     final pos = _reader.position;
     final recordTypeByte = _reader.readByte();
