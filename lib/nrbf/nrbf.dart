@@ -368,8 +368,7 @@ class ArraySingleObjectRecord extends NrbfRecord {
   final int length;
   final List<dynamic> elementValues;
 
-  ArraySingleObjectRecord(
-      this.arrayObjectId, this.length, this.elementValues);
+  ArraySingleObjectRecord(this.arrayObjectId, this.length, this.elementValues);
 
   @override
   RecordType get recordType => RecordType.arraySingleObject;
@@ -385,8 +384,7 @@ class ArraySingleStringRecord extends NrbfRecord {
   final int length;
   final List<dynamic> elementValues;
 
-  ArraySingleStringRecord(
-      this.arrayObjectId, this.length, this.elementValues);
+  ArraySingleStringRecord(this.arrayObjectId, this.length, this.elementValues);
 
   @override
   RecordType get recordType => RecordType.arraySingleString;
@@ -513,49 +511,66 @@ class BinaryReader {
     return _data.getInt8(_position++);
   }
 
+  /// Throws (with the same message as [readByte]) when the next [count] bytes
+  /// would run past the buffer, so a truncated stream rejects with a catchable
+  /// Exception rather than leaking a raw RangeError out of the ByteData read.
+  void _ensure(int count) {
+    if (_position + count > _data.lengthInBytes) {
+      throw Exception('Attempted to read beyond end of buffer');
+    }
+  }
+
   int readInt16() {
+    _ensure(2);
     final value = _data.getInt16(_position, Endian.little);
     _position += 2;
     return value;
   }
 
   int readUInt16() {
+    _ensure(2);
     final value = _data.getUint16(_position, Endian.little);
     _position += 2;
     return value;
   }
 
   int readInt32() {
+    _ensure(4);
     final value = _data.getInt32(_position, Endian.little);
     _position += 4;
     return value;
   }
 
   int readUInt32() {
+    _ensure(4);
     final value = _data.getUint32(_position, Endian.little);
     _position += 4;
     return value;
   }
 
   int readInt64() {
+    _ensure(8);
     final value = _data.getInt64(_position, Endian.little);
     _position += 8;
     return value;
   }
 
   int readUInt64() {
+    _ensure(8);
     final value = _data.getUint64(_position, Endian.little);
     _position += 8;
     return value;
   }
 
   double readSingle() {
+    _ensure(4);
     final value = _data.getFloat32(_position, Endian.little);
     _position += 4;
     return value;
   }
 
   double readDouble() {
+    _ensure(8);
     final value = _data.getFloat64(_position, Endian.little);
     _position += 8;
     return value;
@@ -610,8 +625,12 @@ class BinaryReader {
       throw Exception('Invalid string length');
     }
 
+    _ensure(
+        length); // a length that overruns the buffer is malformed, not a crash
+
     final startPos = _position;
-    final bytes = Uint8List.view(_data.buffer, _data.offsetInBytes + startPos, length);
+    final bytes =
+        Uint8List.view(_data.buffer, _data.offsetInBytes + startPos, length);
     _position += length;
 
     return utf8.decode(bytes);
@@ -782,7 +801,7 @@ class NrbfDecoder {
       _log('\nRecord #$count at offset 0x${pos.toRadixString(16)}');
 
       record = _decodeNext();
-      
+
       // Store ALL records in order (including BinaryLibrary!)
       _allRecordsInOrder.add(record);
 
@@ -815,7 +834,8 @@ class NrbfDecoder {
     if (value is MemberReferenceRecord) {
       final resolved = _recordMap[value.idRef];
       if (resolved != null) {
-        _log('      -> Resolved reference ${value.idRef} to ${resolved.runtimeType}');
+        _log(
+            '      -> Resolved reference ${value.idRef} to ${resolved.runtimeType}');
         return resolved;
       } else {
         _log('      -> WARNING: Could not resolve reference ${value.idRef}');
@@ -833,7 +853,26 @@ class NrbfDecoder {
         '  Offset 0x${pos.toRadixString(16)}: RecordType byte = 0x${recordTypeByte.toRadixString(16)}');
 
     // Validate record type
-    final validTypes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+    final validTypes = [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17
+    ];
     if (!validTypes.contains(recordTypeByte)) {
       throw Exception(
           'Unsupported record type: $recordTypeByte (0x${recordTypeByte.toRadixString(16)}) at offset 0x${pos.toRadixString(16)}');
@@ -954,8 +993,8 @@ class NrbfDecoder {
 
       switch (binaryType) {
         case BinaryType.primitive:
-          additionalInfos
-              .add(PrimitiveTypeInfo(PrimitiveType.fromValue(_reader.readByte())));
+          additionalInfos.add(
+              PrimitiveTypeInfo(PrimitiveType.fromValue(_reader.readByte())));
           break;
         case BinaryType.systemClass:
           additionalInfos
@@ -1056,7 +1095,8 @@ class NrbfDecoder {
       RecordType.classWithMembers,
     );
 
-    _metadataMap[classInfo.objectId] = _MetadataInfo(classInfo, null, libraryId);
+    _metadataMap[classInfo.objectId] =
+        _MetadataInfo(classInfo, null, libraryId);
     _recordMap[classInfo.objectId] = record;
 
     _log('      Reading ${classInfo.memberCount} member values (no type info)');
@@ -1102,7 +1142,8 @@ class NrbfDecoder {
       _readMemberValues(
           record, classInfo.memberNames, metadata.memberTypeInfo!);
     } else {
-      _log('      Reading ${classInfo.memberCount} member values (no type info)');
+      _log(
+          '      Reading ${classInfo.memberCount} member values (no type info)');
       for (final memberName in classInfo.memberNames) {
         final value = _decodeNext();
         record.memberValues[memberName] = value;
@@ -1113,8 +1154,8 @@ class NrbfDecoder {
     return record;
   }
 
-  void _readMemberValues(
-      ClassRecord record, List<String> memberNames, MemberTypeInfo memberTypeInfo) {
+  void _readMemberValues(ClassRecord record, List<String> memberNames,
+      MemberTypeInfo memberTypeInfo) {
     _log('      Reading ${memberNames.length} member values:');
     for (int i = 0; i < memberNames.length; i++) {
       final memberName = memberNames[i];
@@ -1122,10 +1163,10 @@ class NrbfDecoder {
       final additionalInfo = memberTypeInfo.additionalInfos[i];
 
       var value = _readObjectValue(binaryType, additionalInfo);
-      
+
       // DON'T auto-resolve here - keep the reference!
       // The UI/encoder will resolve when needed
-      
+
       record.memberValues[memberName] = value;
       _log('        $memberName = ${_formatValueForLog(value)}');
     }
@@ -1194,8 +1235,7 @@ class NrbfDecoder {
 
   BinaryArrayRecord _decodeBinaryArray() {
     final objectId = _reader.readInt32();
-    final binaryArrayTypeEnum =
-        BinaryArrayType.fromValue(_reader.readByte());
+    final binaryArrayTypeEnum = BinaryArrayType.fromValue(_reader.readByte());
     final rank = _reader.readInt32();
 
     final lengths = <int>[];
@@ -1220,7 +1260,8 @@ class NrbfDecoder {
     _log(
         '      objectId=$objectId, arrayType=${binaryArrayTypeEnum.name}, rank=$rank, lengths=$lengths, totalElements=$totalElements');
 
-    final elementValues = _readAllElements(totalElements, typeEnum, additionalTypeInfo);
+    final elementValues =
+        _readAllElements(totalElements, typeEnum, additionalTypeInfo);
 
     final record = BinaryArrayRecord(
       objectId,
@@ -1297,8 +1338,8 @@ class NrbfDecoder {
       elements.add(_readPrimitiveValue(primitiveTypeEnum));
     }
 
-    final record =
-        ArraySinglePrimitiveRecord(objectId, length, primitiveTypeEnum, elements);
+    final record = ArraySinglePrimitiveRecord(
+        objectId, length, primitiveTypeEnum, elements);
     _recordMap[objectId] = record;
     return record;
   }
@@ -1418,17 +1459,17 @@ class NrbfEncoder {
     if (_decoder != null) {
       // CRITICAL: Write records in THE EXACT SAME ORDER as they were decoded!
       final allRecords = _decoder!.getAllRecordsInOrder();
-      
+
       for (final record in allRecords) {
         // Skip MessageEndRecord - we'll write it at the end
         if (record is MessageEndRecord) continue;
-        
+
         // Write BinaryLibrary records as they appear
         if (record is BinaryLibrary) {
           _encodeBinaryLibrary(record);
           continue;
         }
-        
+
         // Write other records
         if (record.objectId != null) {
           if (!_writtenRecords.contains(record.objectId!)) {
@@ -1440,7 +1481,8 @@ class NrbfEncoder {
       // Fallback: If no decoder, collect records from graph
       final allRecords = _collectAllRecords(root);
       for (final record in allRecords) {
-        if (record.objectId != null && !_writtenRecords.contains(record.objectId!)) {
+        if (record.objectId != null &&
+            !_writtenRecords.contains(record.objectId!)) {
           _encodeRecord(record);
         }
       }
@@ -1712,8 +1754,8 @@ class NrbfEncoder {
     _writer.writeByte(record.nullCount);
   }
 
-  void _writeObjectValue(
-      dynamic value, BinaryType? binaryType, AdditionalTypeInfo? additionalInfo) {
+  void _writeObjectValue(dynamic value, BinaryType? binaryType,
+      AdditionalTypeInfo? additionalInfo) {
     if (value == null) {
       _writer.writeByte(RecordType.objectNull.value);
       return;
@@ -1907,8 +1949,7 @@ class NrbfUtils {
     final data = Uint8List.fromList(buffer);
 
     for (int i = 0; i < 16; i++) {
-      data[offset + i] =
-          int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
+      data[offset + i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
     }
 
     return data;
