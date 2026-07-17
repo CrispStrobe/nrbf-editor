@@ -39,6 +39,36 @@ void main() {
     expect(decodeError(bytes), isNull);
   });
 
+  test('a huge ObjectNullMultiple count is rejected, not materialised (DoS)',
+      () {
+    // ~30 bytes: an object array of length 1 whose single element is an
+    // ObjectNullMultiple claiming 2 billion nulls. Un-bounded, the decoder
+    // would build a 2-billion-entry list and exhaust memory; it must reject.
+    Uint8List i32(int v) =>
+        Uint8List(4)..buffer.asByteData().setInt32(0, v, Endian.little);
+    final bomb = <int>[
+      0x00, ...i32(1), ...i32(0), ...i32(1), ...i32(0), // header
+      16, ...i32(1), ...i32(1), // ArraySingleObject id=1 length=1
+      14, ...i32(2000000000), // ObjectNullMultiple nullCount=2e9
+      0x0B,
+    ];
+    final sw = Stopwatch()..start();
+    expect(decodeError(bomb), isNull); // Exception, not an Error/OOM
+    expect(
+        sw.elapsedMilliseconds, lessThan(1000)); // rejected, not chewing memory
+  });
+
+  test('a huge array length is rejected against the remaining buffer', () {
+    Uint8List i32(int v) =>
+        Uint8List(4)..buffer.asByteData().setInt32(0, v, Endian.little);
+    final bomb = <int>[
+      0x00, ...i32(1), ...i32(0), ...i32(1), ...i32(0),
+      15, ...i32(1), ...i32(2000000000),
+      8, // ArraySinglePrimitive len=2e9 int32
+    ];
+    expect(decodeError(bomb), isNull);
+  });
+
   test('no malformed stream leaks a non-Exception error over 60k mutations',
       () {
     final rng = Random(1);

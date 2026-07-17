@@ -1236,7 +1236,7 @@ class NrbfDecoder {
   BinaryArrayRecord _decodeBinaryArray() {
     final objectId = _reader.readInt32();
     final binaryArrayTypeEnum = BinaryArrayType.fromValue(_reader.readByte());
-    final rank = _reader.readInt32();
+    final rank = _boundedCount(_reader.readInt32());
 
     final lengths = <int>[];
     for (int i = 0; i < rank; i++) {
@@ -1256,7 +1256,10 @@ class NrbfDecoder {
     final typeEnum = BinaryType.fromValue(_reader.readByte());
     final additionalTypeInfo = _readAdditionalTypeInfo(typeEnum);
 
-    final totalElements = lengths.reduce((a, b) => a * b);
+    // A 0-rank array has no lengths (reduce would throw); the product of the
+    // dimension lengths can also overflow to a huge/negative value — bound it.
+    final totalElements =
+        _boundedCount(lengths.isEmpty ? 0 : lengths.reduce((a, b) => a * b));
     _log(
         '      objectId=$objectId, arrayType=${binaryArrayTypeEnum.name}, rank=$rank, lengths=$lengths, totalElements=$totalElements');
 
@@ -1293,6 +1296,20 @@ class NrbfDecoder {
     }
   }
 
+  /// Rejects an element/array count that is negative or larger than the bytes
+  /// remaining. A compact record can otherwise claim billions of elements from
+  /// a handful of bytes (a huge array length, or an `ObjectNullMultiple`
+  /// `nullCount`) and exhaust memory — the classic decompression-bomb DoS. A
+  /// real element record consumes at least a byte, so a count past the buffer
+  /// is malformed.
+  int _boundedCount(int n) {
+    if (n < 0 || n > _reader.remaining) {
+      throw Exception(
+          'Element count $n out of range (${_reader.remaining} bytes left)');
+    }
+    return n;
+  }
+
   List<dynamic> _readAllElements(
       int count, BinaryType binaryType, AdditionalTypeInfo additionalInfo) {
     final elements = <dynamic>[];
@@ -1302,6 +1319,13 @@ class NrbfDecoder {
       final val = _readObjectValue(binaryType, additionalInfo);
 
       if (val is ObjectNullMultipleRecord) {
+        // The nulls fill array slots; a count past the remaining slots (or a
+        // negative one) is malformed and must not materialise billions of
+        // entries.
+        if (val.nullCount < 0 || i + val.nullCount > count) {
+          throw Exception(
+              'ObjectNullMultiple count ${val.nullCount} overflows the array');
+        }
         for (int j = 0; j < val.nullCount; j++) {
           elements.add(null);
         }
@@ -1327,7 +1351,7 @@ class NrbfDecoder {
 
   ArraySinglePrimitiveRecord _decodeArraySinglePrimitive() {
     final objectId = _reader.readInt32();
-    final length = _reader.readInt32();
+    final length = _boundedCount(_reader.readInt32());
     final primitiveTypeEnum = PrimitiveType.fromValue(_reader.readByte());
 
     _log(
@@ -1346,7 +1370,7 @@ class NrbfDecoder {
 
   ArraySingleObjectRecord _decodeArraySingleObject() {
     final objectId = _reader.readInt32();
-    final length = _reader.readInt32();
+    final length = _boundedCount(_reader.readInt32());
 
     _log('      objectId=$objectId, length=$length');
 
@@ -1360,7 +1384,7 @@ class NrbfDecoder {
 
   ArraySingleStringRecord _decodeArraySingleString() {
     final objectId = _reader.readInt32();
-    final length = _reader.readInt32();
+    final length = _boundedCount(_reader.readInt32());
 
     _log('      objectId=$objectId, length=$length');
 
