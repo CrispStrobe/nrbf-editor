@@ -38,22 +38,23 @@ class DebugLogger {
 
   static void log(String message, {LogLevel level = LogLevel.info}) {
     if (!enabled) return;
-    
+
     final entry = LogEntry(
       message: message,
       level: level,
       timestamp: DateTime.now(),
     );
-    
+
     _logs.add(entry);
     developer.log(message, name: 'NrbfEditor', level: level.value);
-    print('[${level.name.toUpperCase()}] ${entry.timestamp.toIso8601String()} - $message');
-    
+    print(
+        '[${level.name.toUpperCase()}] ${entry.timestamp.toIso8601String()} - $message');
+
     // Notify listeners
     for (final listener in _listeners) {
       listener();
     }
-    
+
     // Keep only last 1000 logs
     if (_logs.length > 1000) {
       _logs.removeRange(0, _logs.length - 1000);
@@ -120,7 +121,8 @@ class NrbfEditorApp extends StatelessWidget {
         useMaterial3: true,
         cardTheme: CardThemeData(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       darkTheme: ThemeData(
@@ -131,7 +133,8 @@ class NrbfEditorApp extends StatelessWidget {
         useMaterial3: true,
         cardTheme: CardThemeData(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       themeMode: ThemeMode.system,
@@ -170,21 +173,22 @@ class _EditorScreenState extends State<EditorScreen> {
   final Map<String, GlobalKey> _nodeKeys = {};
   bool _showFavoritesPanel = false;
   bool _showPresetFieldsPanel = false;
-  
+
   @override
   void initState() {
     super.initState();
     DebugLogger.addListener(_onLogUpdate);
     DebugLogger.log('NRBF Editor initialized', level: LogLevel.info);
-    
+
     // Initialize PresetManager
     PresetManager.instance.initialize().then((_) {
       DebugLogger.log('PresetManager initialized', level: LogLevel.info);
       if (mounted) setState(() {});
     }).catchError((e) {
-      DebugLogger.log('ERROR initializing PresetManager: $e', level: LogLevel.error);
+      DebugLogger.log('ERROR initializing PresetManager: $e',
+          level: LogLevel.error);
     });
-    
+
     PresetManager.instance.addListener(_onPresetChange);
   }
 
@@ -220,80 +224,87 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _pickFile() async {
     try {
-        setState(() {
+      setState(() {
         _isLoading = true;
         _error = null;
-        });
+      });
 
-        DebugLogger.log('=== FILE PICKER INITIATED ===', level: LogLevel.info);
+      DebugLogger.log('=== FILE PICKER INITIATED ===', level: LogLevel.info);
 
-        final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         withData: true,
-        );
+      );
 
-        if (result == null || result.files.first.bytes == null) {
+      if (result == null || result.files.first.bytes == null) {
         DebugLogger.log('File picker cancelled by user', level: LogLevel.info);
         setState(() => _isLoading = false);
         return;
-        }
+      }
 
-        final bytes = result.files.first.bytes!;
-        final fileName = result.files.first.name;
+      final bytes = result.files.first.bytes!;
+      final fileName = result.files.first.name;
 
-        DebugLogger.log('File selected: $fileName', level: LogLevel.info);
-        DebugLogger.log('File size: ${bytes.length} bytes (${_formatBytes(bytes.length)})', level: LogLevel.info);
+      DebugLogger.log('File selected: $fileName', level: LogLevel.info);
+      DebugLogger.log(
+          'File size: ${bytes.length} bytes (${_formatBytes(bytes.length)})',
+          level: LogLevel.info);
 
-        // Validate NRBF header
-        DebugLogger.log('Validating NRBF header...', level: LogLevel.info);
-        if (!NrbfUtils.startsWithPayloadHeader(bytes)) {
-        DebugLogger.log('WARNING: File does not start with valid NRBF header', level: LogLevel.warning);
-        
+      // Validate NRBF header
+      DebugLogger.log('Validating NRBF header...', level: LogLevel.info);
+      if (!NrbfUtils.startsWithPayloadHeader(bytes)) {
+        DebugLogger.log('WARNING: File does not start with valid NRBF header',
+            level: LogLevel.warning);
+
         final shouldContinue = await _showConfirmDialog(
-            'Invalid NRBF Header',
-            'This file does not appear to be a valid NRBF file. Continue anyway?',
+          'Invalid NRBF Header',
+          'This file does not appear to be a valid NRBF file. Continue anyway?',
         );
-        
+
         if (!shouldContinue) {
-            setState(() => _isLoading = false);
-            return;
+          setState(() => _isLoading = false);
+          return;
         }
-        } else {
+      } else {
         DebugLogger.log('✓ Valid NRBF header detected', level: LogLevel.info);
-        }
+      }
 
-        // Show first 64 bytes for debugging
-        final hexDump = _createHexDump(bytes.sublist(0, bytes.length < 64 ? bytes.length : 64));
-        DebugLogger.log('First 64 bytes:\n$hexDump', level: LogLevel.debug);
+      // Show first 64 bytes for debugging
+      final hexDump = _createHexDump(
+          bytes.sublist(0, bytes.length < 64 ? bytes.length : 64));
+      DebugLogger.log('First 64 bytes:\n$hexDump', level: LogLevel.debug);
 
-        DebugLogger.log('=== STARTING NRBF DECODE ===', level: LogLevel.info);
-        
-        final stopwatch = Stopwatch()..start();
-        _decoder = NrbfDecoder(bytes, verbose: _verboseLogging);
-        final root = _decoder!.decode();
-        stopwatch.stop();
+      DebugLogger.log('=== STARTING NRBF DECODE ===', level: LogLevel.info);
 
-        DebugLogger.log('=== DECODE COMPLETED ===', level: LogLevel.info);
-        DebugLogger.log('Decode time: ${stopwatch.elapsedMilliseconds}ms', level: LogLevel.info);
-        
-        // Gather statistics (DECLARE ONCE, USE TWICE)
-        final allRecords = _decoder!.getAllRecords();
-        _totalRecords = allRecords.length;
-        _recordTypeStats = _gatherRecordTypeStats(allRecords);
-        
-        DebugLogger.log('Total records decoded: $_totalRecords', level: LogLevel.info);
-        DebugLogger.log('Record type breakdown:', level: LogLevel.info);
-        _recordTypeStats.forEach((type, count) {
+      final stopwatch = Stopwatch()..start();
+      _decoder = NrbfDecoder(bytes, verbose: _verboseLogging);
+      final root = _decoder!.decode();
+      stopwatch.stop();
+
+      DebugLogger.log('=== DECODE COMPLETED ===', level: LogLevel.info);
+      DebugLogger.log('Decode time: ${stopwatch.elapsedMilliseconds}ms',
+          level: LogLevel.info);
+
+      // Gather statistics (DECLARE ONCE, USE TWICE)
+      final allRecords = _decoder!.getAllRecords();
+      _totalRecords = allRecords.length;
+      _recordTypeStats = _gatherRecordTypeStats(allRecords);
+
+      DebugLogger.log('Total records decoded: $_totalRecords',
+          level: LogLevel.info);
+      DebugLogger.log('Record type breakdown:', level: LogLevel.info);
+      _recordTypeStats.forEach((type, count) {
         DebugLogger.log('  - $type: $count', level: LogLevel.info);
-        });
+      });
 
-        final libraries = _decoder!.getLibraries();
-        DebugLogger.log('Libraries found: ${libraries.length}', level: LogLevel.info);
-        libraries.forEach((id, name) {
+      final libraries = _decoder!.getLibraries();
+      DebugLogger.log('Libraries found: ${libraries.length}',
+          level: LogLevel.info);
+      libraries.forEach((id, name) {
         DebugLogger.log('  - Library $id: $name', level: LogLevel.info);
-        });
+      });
 
-        setState(() {
+      setState(() {
         _fileBytes = bytes;
         _fileName = fileName;
         _nodeKeys.clear();
@@ -301,53 +312,58 @@ class _EditorScreenState extends State<EditorScreen> {
         _isLoading = false;
         _expandedNodes.clear();
         _expandedNodes[''] = true;
-        });
+      });
 
-        DebugLogger.log('✓ File loaded successfully', level: LogLevel.info);
+      DebugLogger.log('✓ File loaded successfully', level: LogLevel.info);
 
-        // Auto-detect preset (REUSE allRecords and libraries)
-        DebugLogger.log('=== AUTO-DETECTING PRESET ===', level: LogLevel.info);
-        
-        final classNames = <String>[];
-        for (final record in allRecords.values) {
+      // Auto-detect preset (REUSE allRecords and libraries)
+      DebugLogger.log('=== AUTO-DETECTING PRESET ===', level: LogLevel.info);
+
+      final classNames = <String>[];
+      for (final record in allRecords.values) {
         if (record is ClassRecord) {
-            if (!classNames.contains(record.typeName)) {
+          if (!classNames.contains(record.typeName)) {
             classNames.add(record.typeName);
-            }
+          }
         }
-        }
-        
-        final libraryNames = libraries.values.toList();
-        
-        DebugLogger.log('Found ${classNames.length} unique class names', level: LogLevel.debug);
-        DebugLogger.log('Found ${libraryNames.length} libraries', level: LogLevel.debug);
-        
-        final detectedPreset = PresetManager.instance.autoDetectPreset(classNames, libraryNames);
-        if (detectedPreset != null) {
-        PresetManager.instance.setActivePreset(detectedPreset.gameTypeId);
-        DebugLogger.log('✓ Preset auto-detected: ${detectedPreset.displayName}', 
-                        level: LogLevel.info);
-        _showSnackBar('Preset detected: ${detectedPreset.displayName}', success: true);
-        } else {
-        DebugLogger.log('No matching preset found', level: LogLevel.warning);
-        }
-        
-        // Initial search
-        _performSearch();
+      }
 
-        _showSnackBar('File loaded: $_totalRecords records decoded', success: true);
+      final libraryNames = libraries.values.toList();
+
+      DebugLogger.log('Found ${classNames.length} unique class names',
+          level: LogLevel.debug);
+      DebugLogger.log('Found ${libraryNames.length} libraries',
+          level: LogLevel.debug);
+
+      final detectedPreset =
+          PresetManager.instance.autoDetectPreset(classNames, libraryNames);
+      if (detectedPreset != null) {
+        PresetManager.instance.setActivePreset(detectedPreset.gameTypeId);
+        DebugLogger.log('✓ Preset auto-detected: ${detectedPreset.displayName}',
+            level: LogLevel.info);
+        _showSnackBar('Preset detected: ${detectedPreset.displayName}',
+            success: true);
+      } else {
+        DebugLogger.log('No matching preset found', level: LogLevel.warning);
+      }
+
+      // Initial search
+      _performSearch();
+
+      _showSnackBar('File loaded: $_totalRecords records decoded',
+          success: true);
     } catch (e, stackTrace) {
-        DebugLogger.log('ERROR loading file: $e', level: LogLevel.error);
-        DebugLogger.log('Stack trace:\n$stackTrace', level: LogLevel.error);
-        
-        setState(() {
+      DebugLogger.log('ERROR loading file: $e', level: LogLevel.error);
+      DebugLogger.log('Stack trace:\n$stackTrace', level: LogLevel.error);
+
+      setState(() {
         _error = 'Error loading file: $e';
         _isLoading = false;
-        });
+      });
 
-        _showSnackBar('Failed to load file: $e', success: false);
+      _showSnackBar('Failed to load file: $e', success: false);
     }
-    }
+  }
 
   void _performSearch() {
     if (_rootRecord == null) return;
@@ -370,93 +386,98 @@ class _EditorScreenState extends State<EditorScreen> {
     _searchNode(_rootRecord!, '', results, query);
     stopwatch.stop();
 
-    DebugLogger.log('Search completed in ${stopwatch.elapsedMilliseconds}ms', level: LogLevel.debug);
+    DebugLogger.log('Search completed in ${stopwatch.elapsedMilliseconds}ms',
+        level: LogLevel.debug);
     DebugLogger.log('Found ${results.length} matches', level: LogLevel.debug);
 
     setState(() {
       _searchResults = results;
       if (results.isNotEmpty) {
         _selectedSearchResult = results.first;
-        DebugLogger.log('First result: ${results.first.path}', level: LogLevel.debug);
+        DebugLogger.log('First result: ${results.first.path}',
+            level: LogLevel.debug);
       }
     });
   }
 
-  void _searchNode(dynamic node, String path, List<SearchResult> results, String query) {
+  void _searchNode(
+      dynamic node, String path, List<SearchResult> results, String query) {
     // Resolve if it's a reference
     final resolvedNode = _resolveValue(node);
-    
+
     if (resolvedNode is ClassRecord) {
-        // 1. Check Class Name
-        if (resolvedNode.typeName.toLowerCase().contains(query)) {
+      // 1. Check Class Name
+      if (resolvedNode.typeName.toLowerCase().contains(query)) {
         results.add(SearchResult(
-            path: path.isEmpty ? resolvedNode.typeName : '$path.${resolvedNode.typeName}',
-            type: 'Class',
-            value: resolvedNode.typeName,
-            record: resolvedNode,
+          path: path.isEmpty
+              ? resolvedNode.typeName
+              : '$path.${resolvedNode.typeName}',
+          type: 'Class',
+          value: resolvedNode.typeName,
+          record: resolvedNode,
         ));
-        }
+      }
 
-        // 2. Special GUID handling
-        if (resolvedNode.typeName == 'System.Guid') {
+      // 2. Special GUID handling
+      if (resolvedNode.typeName == 'System.Guid') {
         try {
-            final guidString = ClassRecord.reconstructGuid(resolvedNode);
-            if (guidString.toLowerCase().contains(query)) {
+          final guidString = ClassRecord.reconstructGuid(resolvedNode);
+          if (guidString.toLowerCase().contains(query)) {
             results.add(SearchResult(
-                path: path, // GUID is treated as a leaf value for the path
-                type: 'GUID',
-                value: guidString,
-                record: resolvedNode,
+              path: path, // GUID is treated as a leaf value for the path
+              type: 'GUID',
+              value: guidString,
+              record: resolvedNode,
             ));
-            }
-        } catch (e) { /* ignore */ }
-        }
+          }
+        } catch (e) {/* ignore */}
+      }
 
-        // 3. Check Members
-        for (final memberName in resolvedNode.memberNames) {
+      // 3. Check Members
+      for (final memberName in resolvedNode.memberNames) {
         final memberPath = path.isEmpty ? memberName : '$path.$memberName';
         var memberValue = resolvedNode.getValue(memberName);
         memberValue = _resolveValue(memberValue);
 
         // A. Match Member Name
         if (memberName.toLowerCase().contains(query)) {
-            results.add(SearchResult(
+          results.add(SearchResult(
             path: memberPath,
             type: 'Field',
             value: _formatValue(memberValue),
             record: resolvedNode,
-            ));
+          ));
         }
 
         // B. Match Member Value (String/Primitive)
         if (memberValue != null) {
-            final valueStr = _formatValue(memberValue).toLowerCase();
-            if (valueStr.contains(query)) {
+          final valueStr = _formatValue(memberValue).toLowerCase();
+          if (valueStr.contains(query)) {
             results.add(SearchResult(
-                path: memberPath,
-                type: 'Value',
-                value: _formatValue(memberValue),
-                record: resolvedNode,
+              path: memberPath,
+              type: 'Value',
+              value: _formatValue(memberValue),
+              record: resolvedNode,
             ));
-            }
+          }
 
-            // C. Recurse (Deep Search)
-            if (memberValue is NrbfRecord && 
-                memberValue is! MemberReferenceRecord &&
-                (memberValue is! ClassRecord || memberValue.typeName != 'System.Guid')) {
+          // C. Recurse (Deep Search)
+          if (memberValue is NrbfRecord &&
+              memberValue is! MemberReferenceRecord &&
+              (memberValue is! ClassRecord ||
+                  memberValue.typeName != 'System.Guid')) {
             _searchNode(memberValue, memberPath, results, query);
-            }
+          }
         }
-        }
-    } 
+      }
+    }
     // 4. Handle Arrays
     else if (resolvedNode is BinaryArrayRecord ||
         resolvedNode is ArraySinglePrimitiveRecord ||
         resolvedNode is ArraySingleObjectRecord ||
         resolvedNode is ArraySingleStringRecord) {
-        
-        final array = (resolvedNode as dynamic).getArray() as List;
-        for (int i = 0; i < array.length; i++) {
+      final array = (resolvedNode as dynamic).getArray() as List;
+      for (int i = 0; i < array.length; i++) {
         var element = array[i];
         element = _resolveValue(element);
         final elementPath = '$path[$i]';
@@ -464,29 +485,30 @@ class _EditorScreenState extends State<EditorScreen> {
         // Check content of primitives inside array
         final valStr = _formatValue(element).toLowerCase();
         if (valStr.contains(query)) {
-            results.add(SearchResult(
+          results.add(SearchResult(
             path: elementPath,
             type: 'ArrayItem',
             value: _formatValue(element),
             record: resolvedNode,
-            ));
+          ));
         }
 
         // Recurse if complex object
         if (element is NrbfRecord && element is! MemberReferenceRecord) {
-            _searchNode(element, elementPath, results, query);
+          _searchNode(element, elementPath, results, query);
         }
-        }
+      }
     }
-    }
+  }
 
   String _formatValue(dynamic value) {
     // Try to resolve references first
     final resolvedValue = _resolveValue(value);
-    
+
     if (resolvedValue == null) return 'null';
     if (resolvedValue is String) return '"$resolvedValue"';
-    if (resolvedValue is bool || resolvedValue is num) return resolvedValue.toString();
+    if (resolvedValue is bool || resolvedValue is num)
+      return resolvedValue.toString();
     if (resolvedValue is ClassRecord) {
       // AUTOMATICALLY RECONSTRUCT GUID!
       if (resolvedValue.typeName == 'System.Guid') {
@@ -498,7 +520,8 @@ class _EditorScreenState extends State<EditorScreen> {
       }
       return resolvedValue.typeName;
     }
-    if (resolvedValue is BinaryObjectStringRecord) return '"${resolvedValue.value}"';
+    if (resolvedValue is BinaryObjectStringRecord)
+      return '"${resolvedValue.value}"';
     if (resolvedValue is MemberReferenceRecord) {
       return 'Reference(${resolvedValue.idRef}) [UNRESOLVED]';
     }
@@ -516,129 +539,138 @@ class _EditorScreenState extends State<EditorScreen> {
     if (_rootRecord == null || _fileBytes == null) return;
 
     try {
-        setState(() => _isLoading = true);
+      setState(() => _isLoading = true);
 
-        DebugLogger.log('=== STARTING CROSS-PLATFORM NRBF ENCODE ===', level: LogLevel.info);
+      DebugLogger.log('=== STARTING CROSS-PLATFORM NRBF ENCODE ===',
+          level: LogLevel.info);
 
-        final stopwatch = Stopwatch()..start();
-        final encoder = NrbfEncoder();
-        final encoded = encoder.encode(_rootRecord!, decoder: _decoder);
-        stopwatch.stop();
+      final stopwatch = Stopwatch()..start();
+      final encoder = NrbfEncoder();
+      final encoded = encoder.encode(_rootRecord!, decoder: _decoder);
+      stopwatch.stop();
 
-        DebugLogger.log('=== ENCODE COMPLETED ===', level: LogLevel.info);
-        DebugLogger.log('Encode time: ${stopwatch.elapsedMilliseconds}ms', level: LogLevel.info);
-        DebugLogger.log('Output size: ${encoded.length} bytes (${_formatBytes(encoded.length)})', level: LogLevel.info);
+      DebugLogger.log('=== ENCODE COMPLETED ===', level: LogLevel.info);
+      DebugLogger.log('Encode time: ${stopwatch.elapsedMilliseconds}ms',
+          level: LogLevel.info);
+      DebugLogger.log(
+          'Output size: ${encoded.length} bytes (${_formatBytes(encoded.length)})',
+          level: LogLevel.info);
 
-        final String suggestedName = _fileName ?? 'edited.sav';
+      final String suggestedName = _fileName ?? 'edited.sav';
 
-        if (kIsWeb) {
+      if (kIsWeb) {
         // WEB / PWA
-        DebugLogger.log('Platform detected: Web. Initializing Blob download.', level: LogLevel.debug);
-        
+        DebugLogger.log('Platform detected: Web. Initializing Blob download.',
+            level: LogLevel.debug);
+
         final blob = html.Blob([encoded]);
         final url = html.Url.createObjectUrlFromBlob(blob);
         final anchor = html.document.createElement('a') as html.AnchorElement
-            ..href = url
-            ..style.display = 'none'
-            ..download = suggestedName;
-        
+          ..href = url
+          ..style.display = 'none'
+          ..download = suggestedName;
+
         html.document.body?.children.add(anchor);
         anchor.click();
         html.document.body?.children.remove(anchor);
         html.Url.revokeObjectUrl(url);
-        
-        DebugLogger.log('✓ Web download triggered via anchor element', level: LogLevel.info);
-        } else {
+
+        DebugLogger.log('✓ Web download triggered via anchor element',
+            level: LogLevel.info);
+      } else {
         // MACOS / WINDOWS / MOBILE
-        DebugLogger.log('Platform detected: Native. Opening Save Dialog.', level: LogLevel.debug);
+        DebugLogger.log('Platform detected: Native. Opening Save Dialog.',
+            level: LogLevel.debug);
 
         const typeGroup = selector.XTypeGroup(
-            label: 'NRBF Files',
-            extensions: ['sav', 'dat', 'bin'],
+          label: 'NRBF Files',
+          extensions: ['sav', 'dat', 'bin'],
         );
 
         // Note: use getSaveLocation (v1.0+) or getSavePath depending on your exact version
         final path = await selector.getSaveLocation(
-            suggestedName: suggestedName,
-            acceptedTypeGroups: [typeGroup],
+          suggestedName: suggestedName,
+          acceptedTypeGroups: [typeGroup],
         );
 
         if (path == null) {
-            DebugLogger.log('Save operation cancelled by user', level: LogLevel.info);
-            setState(() => _isLoading = false);
-            return;
+          DebugLogger.log('Save operation cancelled by user',
+              level: LogLevel.info);
+          setState(() => _isLoading = false);
+          return;
         }
 
         final io.File file = io.File(path.path);
         await file.writeAsBytes(encoded);
-        
-        DebugLogger.log('✓ File written to disk: ${path.path}', level: LogLevel.info);
-        }
 
-        setState(() => _isLoading = false);
-        _showSnackBar('File saved successfully: ${_formatBytes(encoded.length)}', success: true);
+        DebugLogger.log('✓ File written to disk: ${path.path}',
+            level: LogLevel.info);
+      }
 
+      setState(() => _isLoading = false);
+      _showSnackBar('File saved successfully: ${_formatBytes(encoded.length)}',
+          success: true);
     } catch (e, stackTrace) {
-        DebugLogger.log('ERROR saving file: $e', level: LogLevel.error);
-        DebugLogger.log('Stack trace:\n$stackTrace', level: LogLevel.error);
+      DebugLogger.log('ERROR saving file: $e', level: LogLevel.error);
+      DebugLogger.log('Stack trace:\n$stackTrace', level: LogLevel.error);
 
-        setState(() {
+      setState(() {
         _error = 'Error saving file: $e';
         _isLoading = false;
-        });
+      });
 
-        _showSnackBar('Failed to save file: $e', success: false);
+      _showSnackBar('Failed to save file: $e', success: false);
     }
-    }
+  }
 
   Future<void> _exportToJson() async {
     if (_rootRecord == null) return;
 
     try {
-        DebugLogger.log('=== EXPORTING TO JSON ===', level: LogLevel.info);
+      DebugLogger.log('=== EXPORTING TO JSON ===', level: LogLevel.info);
 
-        final stopwatch = Stopwatch()..start();
-        final jsonData = _recordToJson(_rootRecord!);
-        final jsonString = const JsonEncoder.withIndent('  ').convert(jsonData);
-        stopwatch.stop();
+      final stopwatch = Stopwatch()..start();
+      final jsonData = _recordToJson(_rootRecord!);
+      final jsonString = const JsonEncoder.withIndent('  ').convert(jsonData);
+      stopwatch.stop();
 
-        final String jsonFileName = '${_fileName ?? 'export'}.json';
+      final String jsonFileName = '${_fileName ?? 'export'}.json';
 
-        if (kIsWeb) {
+      if (kIsWeb) {
         final blob = html.Blob([jsonString]);
         final url = html.Url.createObjectUrlFromBlob(blob);
         final anchor = html.document.createElement('a') as html.AnchorElement
-            ..href = url
-            ..style.display = 'none'
-            ..download = jsonFileName;
+          ..href = url
+          ..style.display = 'none'
+          ..download = jsonFileName;
         html.document.body?.children.add(anchor);
         anchor.click();
         html.document.body?.children.remove(anchor);
         html.Url.revokeObjectUrl(url);
-        } else {
+      } else {
         const typeGroup = selector.XTypeGroup(
-            label: 'JSON Files',
-            extensions: ['json'],
+          label: 'JSON Files',
+          extensions: ['json'],
         );
 
         final path = await selector.getSaveLocation(
-            suggestedName: jsonFileName,
-            acceptedTypeGroups: [typeGroup],
+          suggestedName: jsonFileName,
+          acceptedTypeGroups: [typeGroup],
         );
 
         if (path != null) {
-            final io.File file = io.File(path.path);
-            await file.writeAsString(jsonString);
+          final io.File file = io.File(path.path);
+          await file.writeAsString(jsonString);
         }
-        }
+      }
 
-        DebugLogger.log('✓ JSON exported successfully', level: LogLevel.info);
-        _showSnackBar('Exported to JSON successfully', success: true);
+      DebugLogger.log('✓ JSON exported successfully', level: LogLevel.info);
+      _showSnackBar('Exported to JSON successfully', success: true);
     } catch (e, stackTrace) {
-        DebugLogger.log('ERROR exporting to JSON: $e', level: LogLevel.error);
-        _showSnackBar('Failed to export JSON: $e', success: false);
+      DebugLogger.log('ERROR exporting to JSON: $e', level: LogLevel.error);
+      _showSnackBar('Failed to export JSON: $e', success: false);
     }
-    }
+  }
 
   Map<String, dynamic> _recordToJson(dynamic record) {
     if (record is ClassRecord) {
@@ -653,7 +685,7 @@ class _EditorScreenState extends State<EditorScreen> {
           // Fall through to normal handling
         }
       }
-      
+
       final map = <String, dynamic>{
         '_type': 'ClassRecord',
         'recordType': record.recordType.name,
@@ -676,7 +708,10 @@ class _EditorScreenState extends State<EditorScreen> {
         'arrayType': record.binaryArrayTypeEnum.name,
         'rank': record.rank,
         'lengths': record.lengths,
-        'elements': record.getArray().map((e) => _valueToJson(_resolveValue(e))).toList(),
+        'elements': record
+            .getArray()
+            .map((e) => _valueToJson(_resolveValue(e)))
+            .toList(),
       };
     } else if (record is ArraySinglePrimitiveRecord) {
       return {
@@ -691,7 +726,10 @@ class _EditorScreenState extends State<EditorScreen> {
         '_type': 'ArraySingleObjectRecord',
         'objectId': record.objectId,
         'length': record.length,
-        'elements': record.getArray().map((e) => _valueToJson(_resolveValue(e))).toList(),
+        'elements': record
+            .getArray()
+            .map((e) => _valueToJson(_resolveValue(e)))
+            .toList(),
       };
     } else if (record is ArraySingleStringRecord) {
       return {
@@ -742,7 +780,7 @@ class _EditorScreenState extends State<EditorScreen> {
     final buffer = StringBuffer();
     for (int i = 0; i < bytes.length; i += 16) {
       buffer.write('${i.toRadixString(16).padLeft(4, '0')}: ');
-      
+
       // Hex
       for (int j = 0; j < 16; j++) {
         if (i + j < bytes.length) {
@@ -751,9 +789,9 @@ class _EditorScreenState extends State<EditorScreen> {
           buffer.write('   ');
         }
       }
-      
+
       buffer.write(' ');
-      
+
       // ASCII
       for (int j = 0; j < 16 && i + j < bytes.length; j++) {
         final byte = bytes[i + j];
@@ -763,7 +801,7 @@ class _EditorScreenState extends State<EditorScreen> {
           buffer.write('.');
         }
       }
-      
+
       buffer.writeln();
     }
     return buffer.toString();
@@ -819,7 +857,11 @@ class _EditorScreenState extends State<EditorScreen> {
           children: [
             const Icon(Icons.edit_document),
             const SizedBox(width: 8),
-            const Text('NRBF Save Editor'),
+            // Flexible + ellipsis so the title shrinks on a narrow app bar
+            // rather than overflowing past the action buttons.
+            const Flexible(
+              child: Text('NRBF Save Editor', overflow: TextOverflow.ellipsis),
+            ),
             if (_fileName != null) ...[
               const SizedBox(width: 16),
               Flexible(
@@ -842,11 +884,14 @@ class _EditorScreenState extends State<EditorScreen> {
                 label: Text('$_totalRecords records'),
               ),
             ),
-          
+
           // Verbose logging toggle
           IconButton(
-            icon: Icon(_verboseLogging ? Icons.bug_report : Icons.bug_report_outlined),
-            tooltip: _verboseLogging ? 'Disable verbose logging' : 'Enable verbose logging',
+            icon: Icon(
+                _verboseLogging ? Icons.bug_report : Icons.bug_report_outlined),
+            tooltip: _verboseLogging
+                ? 'Disable verbose logging'
+                : 'Enable verbose logging',
             onPressed: () {
               setState(() {
                 _verboseLogging = !_verboseLogging;
@@ -858,16 +903,18 @@ class _EditorScreenState extends State<EditorScreen> {
               );
             },
           ),
-          
+
           // Debug console toggle
           IconButton(
-            icon: Icon(_showDebugConsole ? Icons.terminal : Icons.terminal_outlined),
-            tooltip: _showDebugConsole ? 'Hide debug console' : 'Show debug console',
+            icon: Icon(
+                _showDebugConsole ? Icons.terminal : Icons.terminal_outlined),
+            tooltip:
+                _showDebugConsole ? 'Hide debug console' : 'Show debug console',
             onPressed: () {
               setState(() => _showDebugConsole = !_showDebugConsole);
             },
           ),
-          
+
           // Clear logs
           IconButton(
             icon: const Icon(Icons.clear_all),
@@ -902,7 +949,8 @@ class _EditorScreenState extends State<EditorScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        const Icon(Icons.error_outline,
+                            size: 64, color: Colors.red),
                         const SizedBox(height: 16),
                         Text(
                           'Error',
@@ -947,14 +995,16 @@ class _EditorScreenState extends State<EditorScreen> {
                                       ),
 
                                       // Preset Fields panel (ADD THIS)
-                                      if (_showPresetFieldsPanel && 
-                                          PresetManager.instance.hasActivePreset)
+                                      if (_showPresetFieldsPanel &&
+                                          PresetManager
+                                              .instance.hasActivePreset)
                                         Container(
                                           width: 300,
                                           decoration: BoxDecoration(
                                             border: Border(
                                               left: BorderSide(
-                                                color: Theme.of(context).dividerColor,
+                                                color: Theme.of(context)
+                                                    .dividerColor,
                                               ),
                                             ),
                                           ),
@@ -962,14 +1012,16 @@ class _EditorScreenState extends State<EditorScreen> {
                                         ),
 
                                       // Favorites panel
-                                      if (_showFavoritesPanel && 
-                                          PresetManager.instance.hasActivePreset)
+                                      if (_showFavoritesPanel &&
+                                          PresetManager
+                                              .instance.hasActivePreset)
                                         Container(
                                           width: 300,
                                           decoration: BoxDecoration(
                                             border: Border(
                                               left: BorderSide(
-                                                color: Theme.of(context).dividerColor,
+                                                color: Theme.of(context)
+                                                    .dividerColor,
                                               ),
                                             ),
                                           ),
@@ -983,7 +1035,8 @@ class _EditorScreenState extends State<EditorScreen> {
                                           decoration: BoxDecoration(
                                             border: Border(
                                               left: BorderSide(
-                                                color: Theme.of(context).dividerColor,
+                                                color: Theme.of(context)
+                                                    .dividerColor,
                                               ),
                                             ),
                                           ),
@@ -1002,7 +1055,9 @@ class _EditorScreenState extends State<EditorScreen> {
                         width: 500,
                         decoration: BoxDecoration(
                           border: Border(
-                            left: BorderSide(color: Theme.of(context).dividerColor, width: 2),
+                            left: BorderSide(
+                                color: Theme.of(context).dividerColor,
+                                width: 2),
                           ),
                         ),
                         child: _buildDebugConsole(),
@@ -1045,18 +1100,19 @@ class _EditorScreenState extends State<EditorScreen> {
               label: const Text('Export JSON'),
             ),
             const SizedBox(width: 16),
-            
+
             // Preset selector dropdown
             PopupMenuButton<String>(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.games),
                     const SizedBox(width: 8),
-                    Text(PresetManager.instance.activePreset?.displayName ?? 
-                         'No preset'),
+                    Text(PresetManager.instance.activePreset?.displayName ??
+                        'No preset'),
                     const Icon(Icons.arrow_drop_down),
                   ],
                 ),
@@ -1088,10 +1144,11 @@ class _EditorScreenState extends State<EditorScreen> {
                       children: [
                         Icon(
                           Icons.games,
-                          color: PresetManager.instance.activePreset?.gameTypeId == 
-                                 preset.gameTypeId
-                              ? Theme.of(context).colorScheme.primary
-                              : null,
+                          color:
+                              PresetManager.instance.activePreset?.gameTypeId ==
+                                      preset.gameTypeId
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
                         ),
                         const SizedBox(width: 8),
                         Text(preset.displayName),
@@ -1102,25 +1159,32 @@ class _EditorScreenState extends State<EditorScreen> {
               ],
             ),
             const SizedBox(width: 8),
-            
+
             // Favorites toggle
             IconButton(
               icon: Icon(_showFavoritesPanel ? Icons.star : Icons.star_border),
-              tooltip: _showFavoritesPanel ? 'Hide favorites' : 'Show favorites',
+              tooltip:
+                  _showFavoritesPanel ? 'Hide favorites' : 'Show favorites',
               onPressed: PresetManager.instance.hasActivePreset
-                  ? () => setState(() => _showFavoritesPanel = !_showFavoritesPanel)
+                  ? () =>
+                      setState(() => _showFavoritesPanel = !_showFavoritesPanel)
                   : null,
             ),
 
             // Preset fields toggle
             IconButton(
-              icon: Icon(_showPresetFieldsPanel ? Icons.playlist_play : Icons.playlist_play_outlined),
-              tooltip: _showPresetFieldsPanel ? 'Hide preset fields' : 'Show preset fields',
+              icon: Icon(_showPresetFieldsPanel
+                  ? Icons.playlist_play
+                  : Icons.playlist_play_outlined),
+              tooltip: _showPresetFieldsPanel
+                  ? 'Hide preset fields'
+                  : 'Show preset fields',
               onPressed: PresetManager.instance.hasActivePreset
-                  ? () => setState(() => _showPresetFieldsPanel = !_showPresetFieldsPanel)
+                  ? () => setState(
+                      () => _showPresetFieldsPanel = !_showPresetFieldsPanel)
                   : null,
             ),
-            
+
             // Preset editor
             IconButton(
               icon: const Icon(Icons.settings),
@@ -1147,11 +1211,9 @@ class _EditorScreenState extends State<EditorScreen> {
                 );
               },
             ),
-            
+
             const SizedBox(width: 16),
           ],
-
-          
 
           // Search
           if (_rootRecord != null) ...[
@@ -1209,7 +1271,7 @@ class _EditorScreenState extends State<EditorScreen> {
   void _expandAll(dynamic node, String path) {
     // RESOLVE REFERENCE
     final resolvedNode = _resolveValue(node);
-    
+
     // We do not rename empty path to 'root' but use path as-is.
     // The UI builder uses '' for the root key, so we must use '' here too.
     _expandedNodes[path] = true;
@@ -1220,13 +1282,12 @@ class _EditorScreenState extends State<EditorScreen> {
         final value = resolvedNode.getValue(memberName);
         _expandAll(value, memberPath);
       }
-    } 
+    }
     // Handle Arrays so "Expand All" doesn't stop at lists
     else if (resolvedNode is BinaryArrayRecord ||
         resolvedNode is ArraySinglePrimitiveRecord ||
         resolvedNode is ArraySingleObjectRecord ||
         resolvedNode is ArraySingleStringRecord) {
-      
       final array = (resolvedNode as dynamic).getArray() as List;
       for (int i = 0; i < array.length; i++) {
         final elementPath = '$path[$i]';
@@ -1279,8 +1340,8 @@ class _EditorScreenState extends State<EditorScreen> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  _buildFeature(Icons.visibility, 'Files with NRBF structures like unity game .sav files'),
-
+                  _buildFeature(Icons.visibility,
+                      'Files with NRBF structures like unity game .sav files'),
                 ],
               ),
             ),
@@ -1297,7 +1358,10 @@ class _EditorScreenState extends State<EditorScreen> {
         children: [
           Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 12),
-          Text(text),
+          // Flexible + ellipsis so a long feature label shrinks on a narrow
+          // window / phone instead of overflowing the row (ellipsis keeps it to
+          // one line, so the enclosing column's height is unchanged).
+          Flexible(child: Text(text, overflow: TextOverflow.ellipsis)),
         ],
       ),
     );
@@ -1321,7 +1385,7 @@ class _EditorScreenState extends State<EditorScreen> {
         record = resolved;
       }
     }
-    
+
     if (record is ClassRecord) {
       return _buildClassRecordTile(record, path, depth);
     } else if (record is BinaryArrayRecord ||
@@ -1333,7 +1397,8 @@ class _EditorScreenState extends State<EditorScreen> {
       return _buildValueTile('String', record.value, depth);
     } else if (record is MemberReferenceRecord) {
       // If we couldn't resolve it, show as reference
-      return _buildValueTile('Reference [UNRESOLVED]', 'ID: ${record.idRef}', depth);
+      return _buildValueTile(
+          'Reference [UNRESOLVED]', 'ID: ${record.idRef}', depth);
     } else {
       return _buildValueTile(record.runtimeType.toString(), '', depth);
     }
@@ -1353,7 +1418,10 @@ class _EditorScreenState extends State<EditorScreen> {
           margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
           decoration: BoxDecoration(
             color: matchesSearch
-                ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2)
+                ? Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withOpacity(0.2)
                 : null,
             borderRadius: BorderRadius.circular(8),
           ),
@@ -1411,105 +1479,113 @@ class _EditorScreenState extends State<EditorScreen> {
           final memberPath = path.isEmpty ? memberName : '$path.$memberName';
 
           var value = record.getValue(memberName);
-          
+
           // RESOLVE REFERENCES HERE!
           value = _resolveValue(value);
 
           // Build nested field with member name preserved
-          return _buildMemberField(record, memberName, value, memberPath, depth + 1);
+          return _buildMemberField(
+              record, memberName, value, memberPath, depth + 1);
         }).toList(),
       ),
     );
   }
 
   // Build member field that preserves field names for nested records
-  Widget _buildMemberField(ClassRecord parentRecord, String memberName, dynamic value, String path, int depth) {
+  Widget _buildMemberField(ClassRecord parentRecord, String memberName,
+      dynamic value, String path, int depth) {
     // Resolve references
     value = _resolveValue(value);
     final key = _nodeKeys.putIfAbsent(path, () => GlobalKey()); // Register key
-    
+
     // If it's a nested ClassRecord, show field name + class
     if (value is ClassRecord) {
-    final nodePath = path;
-    final isExpanded = _expandedNodes[nodePath] ?? false;
-    final matchesSearch = _searchQuery.isNotEmpty &&
-        (memberName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            value.typeName.toLowerCase().contains(_searchQuery.toLowerCase()));
+      final nodePath = path;
+      final isExpanded = _expandedNodes[nodePath] ?? false;
+      final matchesSearch = _searchQuery.isNotEmpty &&
+          (memberName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              value.typeName
+                  .toLowerCase()
+                  .contains(_searchQuery.toLowerCase()));
 
-    // Special handling for System.Guid - CHECK FOR PRESET FIRST!
-    if (value.typeName == 'System.Guid') {
-      // Check if there's a preset for this path
-      final fieldPreset = PresetManager.instance.findPresetForPath(path);
-      
-      if (fieldPreset != null) {
-        // Use PresetSelectorWidget
-        DebugLogger.log('Using preset selector for GUID at path: $path', level: LogLevel.debug);
-        return PresetSelectorWidget(
-          key: key,
-          parentRecord: parentRecord,
-          memberName: memberName,
-          currentValue: value,
-          fieldPreset: fieldPreset,
-          path: path,
-          onValueChanged: (newValue) {
-            try {
-              applyGuidToRecord(value, newValue);
-              setState(() {});
-              _showSnackBar('GUID updated', success: true);
-            } catch (e) {
-              _showSnackBar('Error updating GUID: $e', success: false);
-            }
-          },
-        );
-      }
-      
-      // Default GUID display (no preset found)
-      try {
-        final guidString = ClassRecord.reconstructGuid(value);
-        return Container(
-          key: key,
-          margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
-          decoration: BoxDecoration(
-            color: matchesSearch
-                ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2)
-                : null,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: ListTile(
-            leading: const Icon(Icons.fingerprint, size: 20),
-            title: Row(
-              children: [
-                Expanded(child: Text(memberName)),
-                FavoriteToggle(path: path),
-              ],
-            ),
-            subtitle: Text(guidString),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ADD EDIT BUTTON
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _showGuidEditDialog(value, memberName, guidString),
-                  tooltip: 'Edit GUID',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 20),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: guidString));
-                    _showSnackBar('GUID copied to clipboard', success: true);
-                  },
-                  tooltip: 'Copy GUID',
-                ),
-              ],
-            ),
-          ),
-        );
-      } catch (e) {
-        // Fall through to normal handling
-      }
+      // Special handling for System.Guid - CHECK FOR PRESET FIRST!
+      if (value.typeName == 'System.Guid') {
+        // Check if there's a preset for this path
+        final fieldPreset = PresetManager.instance.findPresetForPath(path);
 
-    } // if System.Guid
+        if (fieldPreset != null) {
+          // Use PresetSelectorWidget
+          DebugLogger.log('Using preset selector for GUID at path: $path',
+              level: LogLevel.debug);
+          return PresetSelectorWidget(
+            key: key,
+            parentRecord: parentRecord,
+            memberName: memberName,
+            currentValue: value,
+            fieldPreset: fieldPreset,
+            path: path,
+            onValueChanged: (newValue) {
+              try {
+                applyGuidToRecord(value, newValue);
+                setState(() {});
+                _showSnackBar('GUID updated', success: true);
+              } catch (e) {
+                _showSnackBar('Error updating GUID: $e', success: false);
+              }
+            },
+          );
+        }
+
+        // Default GUID display (no preset found)
+        try {
+          final guidString = ClassRecord.reconstructGuid(value);
+          return Container(
+            key: key,
+            margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
+            decoration: BoxDecoration(
+              color: matchesSearch
+                  ? Theme.of(context)
+                      .colorScheme
+                      .primaryContainer
+                      .withOpacity(0.2)
+                  : null,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.fingerprint, size: 20),
+              title: Row(
+                children: [
+                  Expanded(child: Text(memberName)),
+                  FavoriteToggle(path: path),
+                ],
+              ),
+              subtitle: Text(guidString),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ADD EDIT BUTTON
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: () =>
+                        _showGuidEditDialog(value, memberName, guidString),
+                    tooltip: 'Edit GUID',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 20),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: guidString));
+                      _showSnackBar('GUID copied to clipboard', success: true);
+                    },
+                    tooltip: 'Copy GUID',
+                  ),
+                ],
+              ),
+            ),
+          );
+        } catch (e) {
+          // Fall through to normal handling
+        }
+      } // if System.Guid
 
       // For other ClassRecords, show as expandable with field name
       return Card(
@@ -1530,34 +1606,36 @@ class _EditorScreenState extends State<EditorScreen> {
           ),
           title: Row(
             children: [
-                Expanded(
-                child: Text.rich( // Changed from RichText to Text.rich
-                    TextSpan(
+              Expanded(
+                child: Text.rich(
+                  // Changed from RichText to Text.rich
+                  TextSpan(
                     // Text.rich will now automatically inherit the theme
                     children: [
-                        TextSpan(
+                      TextSpan(
                         text: memberName,
                         style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        TextSpan(
+                      ),
+                      TextSpan(
                         text: ' [${value.typeName}]',
                         style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontSize: 12,
-                            fontWeight: FontWeight.normal, // Ensure type name isn't bold
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                          fontWeight:
+                              FontWeight.normal, // Ensure type name isn't bold
                         ),
-                        ),
+                      ),
                     ],
-                    ),
+                  ),
                 ),
-                ),
-                if (value.objectId != null)
+              ),
+              if (value.objectId != null)
                 Chip(
-                    label: Text('ID: ${value.objectId}'),
-                    visualDensity: VisualDensity.compact,
+                  label: Text('ID: ${value.objectId}'),
+                  visualDensity: VisualDensity.compact,
                 ),
             ],
-            ),
+          ),
           subtitle: Text('${value.memberNames.length} members'),
           children: value.memberNames.map((nestedMemberName) {
             final nestedMemberPath = '$path.$nestedMemberName';
@@ -1565,12 +1643,13 @@ class _EditorScreenState extends State<EditorScreen> {
             nestedValue = _resolveValue(nestedValue);
 
             // Recursively build nested members
-            return _buildMemberField(value, nestedMemberName, nestedValue, nestedMemberPath, depth + 1);
+            return _buildMemberField(value, nestedMemberName, nestedValue,
+                nestedMemberPath, depth + 1);
           }).toList(),
         ),
       );
     }
-    
+
     // If it's an array, show field name + array
     if (value is BinaryArrayRecord ||
         value is ArraySinglePrimitiveRecord ||
@@ -1578,12 +1657,13 @@ class _EditorScreenState extends State<EditorScreen> {
         value is ArraySingleStringRecord) {
       return _buildArrayMemberField(memberName, value, path, depth);
     }
-    
+
     // Otherwise, it's a primitive - show as editable field
     return _buildEditableField(parentRecord, memberName, value, path, depth);
   }
 
-  void _showGuidEditDialog(ClassRecord guidRecord, String fieldName, String currentGuid) {
+  void _showGuidEditDialog(
+      ClassRecord guidRecord, String fieldName, String currentGuid) {
     final controller = TextEditingController(text: currentGuid);
 
     showDialog(
@@ -1625,18 +1705,18 @@ class _EditorScreenState extends State<EditorScreen> {
           FilledButton(
             onPressed: () {
               final newGuid = controller.text.trim();
-              
+
               // Validate GUID format
               final guidPattern = RegExp(
                 r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
                 caseSensitive: false,
               );
-              
+
               if (!guidPattern.hasMatch(newGuid)) {
                 _showSnackBar('Invalid GUID format', success: false);
                 return;
               }
-              
+
               try {
                 applyGuidToRecord(guidRecord, newGuid);
                 setState(() {});
@@ -1654,7 +1734,8 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   // Build array member field with field name preserved
-  Widget _buildArrayMemberField(String memberName, dynamic arrayRecord, String path, int depth) {
+  Widget _buildArrayMemberField(
+      String memberName, dynamic arrayRecord, String path, int depth) {
     final nodePath = path;
     final isExpanded = _expandedNodes[nodePath] ?? false;
     final array = (arrayRecord as dynamic).getArray() as List;
@@ -1674,25 +1755,27 @@ class _EditorScreenState extends State<EditorScreen> {
         onExpansionChanged: (expanded) {
           setState(() => _expandedNodes[nodePath] = expanded);
         },
-        leading: Icon(Icons.view_list, color: Theme.of(context).colorScheme.tertiary),
-        title: Text.rich( // Changed from RichText to Text.rich
-            TextSpan(
-                children: [
-                TextSpan(
-                    text: memberName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+        leading: Icon(Icons.view_list,
+            color: Theme.of(context).colorScheme.tertiary),
+        title: Text.rich(
+          // Changed from RichText to Text.rich
+          TextSpan(
+            children: [
+              TextSpan(
+                text: memberName,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              TextSpan(
+                text: ' [Array: ${array.length} items]',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                  fontWeight: FontWeight.normal,
                 ),
-                TextSpan(
-                    text: ' [Array: ${array.length} items]',
-                    style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                    fontWeight: FontWeight.normal,
-                    ),
-                ),
-                ],
-            ),
-            ),
+              ),
+            ],
+          ),
+        ),
         children: array.asMap().entries.map((entry) {
           final index = entry.key;
           var element = entry.value;
@@ -1709,10 +1792,11 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  Widget _buildEditableField(ClassRecord record, String memberName, dynamic value, String path, int depth) {
+  Widget _buildEditableField(ClassRecord record, String memberName,
+      dynamic value, String path, int depth) {
     // Check if there's a preset for this path
     final fieldPreset = PresetManager.instance.findPresetForPath(path);
-    
+
     if (fieldPreset != null && _canEdit(value)) {
       // Use PresetSelectorWidget
       return PresetSelectorWidget(
@@ -1740,7 +1824,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 parsedValue = newValue;
                 break;
             }
-            
+
             record.setValue(memberName, parsedValue);
             setState(() {});
             _showSnackBar('Value updated', success: true);
@@ -1750,12 +1834,14 @@ class _EditorScreenState extends State<EditorScreen> {
         },
       );
     }
-    
+
     // Default editable field (existing code)
     final key = _nodeKeys.putIfAbsent(path, () => GlobalKey());
     final matchesSearch = _searchQuery.isNotEmpty &&
         (memberName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            _formatValue(value).toLowerCase().contains(_searchQuery.toLowerCase()));
+            _formatValue(value)
+                .toLowerCase()
+                .contains(_searchQuery.toLowerCase()));
 
     return Container(
       key: key,
@@ -1782,7 +1868,9 @@ class _EditorScreenState extends State<EditorScreen> {
                 onPressed: () => _showEditDialog(record, memberName, value),
               )
             : null,
-        onTap: _canEdit(value) ? () => _showEditDialog(record, memberName, value) : null,
+        onTap: _canEdit(value)
+            ? () => _showEditDialog(record, memberName, value)
+            : null,
       ),
     );
   }
@@ -1802,7 +1890,8 @@ class _EditorScreenState extends State<EditorScreen> {
         onExpansionChanged: (expanded) {
           setState(() => _expandedNodes[nodePath] = expanded);
         },
-        leading: Icon(Icons.view_list, color: Theme.of(context).colorScheme.tertiary),
+        leading: Icon(Icons.view_list,
+            color: Theme.of(context).colorScheme.tertiary),
         title: Text('Array [${array.length} items]'),
         children: array.asMap().entries.map((entry) {
           final index = entry.key;
@@ -1833,9 +1922,11 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Icon _getValueIcon(dynamic value) {
     final resolved = _resolveValue(value);
-    
+
     if (resolved is String) return const Icon(Icons.text_fields, size: 20);
-    if (resolved is bool) return Icon(resolved ? Icons.check_box : Icons.check_box_outline_blank, size: 20);
+    if (resolved is bool)
+      return Icon(resolved ? Icons.check_box : Icons.check_box_outline_blank,
+          size: 20);
     if (resolved is num) return const Icon(Icons.numbers, size: 20);
     if (resolved == null) return const Icon(Icons.block, size: 20);
     if (resolved is ClassRecord && resolved.typeName == 'System.Guid') {
@@ -1866,9 +1957,13 @@ class _EditorScreenState extends State<EditorScreen> {
     return false;
   }
 
-  void _showEditDialog(ClassRecord record, String memberName, dynamic currentValue) {
-    DebugLogger.log('Opening edit dialog for: $memberName', level: LogLevel.debug);
-    DebugLogger.log('Current value: $currentValue (${currentValue.runtimeType})', level: LogLevel.debug);
+  void _showEditDialog(
+      ClassRecord record, String memberName, dynamic currentValue) {
+    DebugLogger.log('Opening edit dialog for: $memberName',
+        level: LogLevel.debug);
+    DebugLogger.log(
+        'Current value: $currentValue (${currentValue.runtimeType})',
+        level: LogLevel.debug);
 
     final controller = TextEditingController(text: currentValue.toString());
     final isNumber = currentValue is num;
@@ -1886,7 +1981,8 @@ class _EditorScreenState extends State<EditorScreen> {
                 title: const Text('Value'),
                 value: currentValue as bool,
                 onChanged: (value) {
-                  DebugLogger.log('Setting $memberName = $value', level: LogLevel.info);
+                  DebugLogger.log('Setting $memberName = $value',
+                      level: LogLevel.info);
                   setState(() {
                     record.setValue(memberName, value);
                   });
@@ -1897,7 +1993,8 @@ class _EditorScreenState extends State<EditorScreen> {
             else
               TextField(
                 controller: controller,
-                keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+                keyboardType:
+                    isNumber ? TextInputType.number : TextInputType.text,
                 decoration: InputDecoration(
                   labelText: 'New Value',
                   hintText: currentValue.toString(),
@@ -1931,7 +2028,8 @@ class _EditorScreenState extends State<EditorScreen> {
                     newValue = controller.text;
                   }
 
-                  DebugLogger.log('Setting $memberName = $newValue', level: LogLevel.info);
+                  DebugLogger.log('Setting $memberName = $newValue',
+                      level: LogLevel.info);
 
                   setState(() {
                     record.setValue(memberName, newValue);
@@ -1940,7 +2038,8 @@ class _EditorScreenState extends State<EditorScreen> {
                   Navigator.pop(context);
                   _showSnackBar('Updated $memberName', success: true);
                 } catch (e) {
-                  DebugLogger.log('ERROR parsing value: $e', level: LogLevel.error);
+                  DebugLogger.log('ERROR parsing value: $e',
+                      level: LogLevel.error);
                   _showSnackBar('Invalid value: $e', success: false);
                 }
               },
@@ -1983,7 +2082,9 @@ class _EditorScreenState extends State<EditorScreen> {
               final isSelected = result == _selectedSearchResult;
 
               return Card(
-                color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : null,
                 child: ListTile(
                   leading: Icon(
                     result.type == 'Class'
@@ -1996,7 +2097,8 @@ class _EditorScreenState extends State<EditorScreen> {
                   title: Text(
                     result.path,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                   subtitle: Column(
@@ -2060,14 +2162,18 @@ class _EditorScreenState extends State<EditorScreen> {
                       Text(
                         'No favorites yet',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Click ★ on any field',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                     ],
@@ -2081,7 +2187,8 @@ class _EditorScreenState extends State<EditorScreen> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
-                        leading: const Icon(Icons.star, color: Colors.amber, size: 20),
+                        leading: const Icon(Icons.star,
+                            color: Colors.amber, size: 20),
                         title: Text(favorite.label),
                         subtitle: Text(
                           favorite.path,
@@ -2095,7 +2202,8 @@ class _EditorScreenState extends State<EditorScreen> {
                         trailing: IconButton(
                           icon: const Icon(Icons.clear, size: 20),
                           onPressed: () {
-                            PresetManager.instance.toggleFavorite(favorite.path);
+                            PresetManager.instance
+                                .toggleFavorite(favorite.path);
                             PresetManager.instance.saveCurrentPreset();
                           },
                         ),
@@ -2119,7 +2227,8 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Widget _buildPresetFieldsPanel() {
-    final fieldPresets = PresetManager.instance.activePreset?.fieldPresets ?? [];
+    final fieldPresets =
+        PresetManager.instance.activePreset?.fieldPresets ?? [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2158,14 +2267,18 @@ class _EditorScreenState extends State<EditorScreen> {
                       Text(
                         'No preset fields',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Add fields in Preset Editor',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                     ],
@@ -2198,7 +2311,8 @@ class _EditorScreenState extends State<EditorScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 FilledButton.icon(
-                                  onPressed: () => _searchForPresetFields(fieldPreset),
+                                  onPressed: () =>
+                                      _searchForPresetFields(fieldPreset),
                                   icon: const Icon(Icons.search),
                                   label: const Text('Find All Matches'),
                                 ),
@@ -2217,17 +2331,19 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _searchForPresetFields(FieldPreset fieldPreset) {
     // Search the entire tree for paths that match this preset
-    DebugLogger.log('Searching for fields matching preset: ${fieldPreset.displayName}',
+    DebugLogger.log(
+        'Searching for fields matching preset: ${fieldPreset.displayName}',
         level: LogLevel.info);
-    
+
     setState(() {
       _searchQuery = fieldPreset.pathPattern;
       _searchController.text = fieldPreset.pathPattern;
     });
-    
+
     _performSearch();
-    
-    _showSnackBar('Found ${_searchResults.length} matches for ${fieldPreset.displayName}',
+
+    _showSnackBar(
+        'Found ${_searchResults.length} matches for ${fieldPreset.displayName}',
         success: true);
   }
 
@@ -2249,7 +2365,7 @@ class _EditorScreenState extends State<EditorScreen> {
       while (currentPath.isNotEmpty) {
         final lastDot = currentPath.lastIndexOf('.');
         final lastBracket = currentPath.lastIndexOf('[');
-        
+
         int cutIndex = -1;
         if (lastDot > lastBracket) {
           cutIndex = lastDot;
@@ -2262,7 +2378,7 @@ class _EditorScreenState extends State<EditorScreen> {
           if (currentPath.isNotEmpty) {
             _expandedNodes[currentPath] = true;
           }
-          break; 
+          break;
         }
 
         currentPath = currentPath.substring(0, cutIndex);
@@ -2282,39 +2398,45 @@ class _EditorScreenState extends State<EditorScreen> {
   void _attemptScrollToPath(String targetPath) {
     // 1. Try exact match
     if (_scrollToKey(targetPath)) {
-      DebugLogger.log('✓ Found and scrolled to exact target: $targetPath', level: LogLevel.info);
+      DebugLogger.log('✓ Found and scrolled to exact target: $targetPath',
+          level: LogLevel.info);
       return;
     }
 
-    DebugLogger.log('⚠ Exact target UI not found. Attempting parents...', level: LogLevel.warning);
+    DebugLogger.log('⚠ Exact target UI not found. Attempting parents...',
+        level: LogLevel.warning);
 
     // 2. Fallback: Walk up the path to find the nearest visible parent
     // This handles cases where the item is inside a list that isn't fully rendered
     String currentPath = targetPath;
     while (currentPath.isNotEmpty) {
-       final lastDot = currentPath.lastIndexOf('.');
-       final lastBracket = currentPath.lastIndexOf('[');
-       int cutIndex = -1;
-       if (lastDot > lastBracket) cutIndex = lastDot;
-       else if (lastBracket > -1) cutIndex = lastBracket;
+      final lastDot = currentPath.lastIndexOf('.');
+      final lastBracket = currentPath.lastIndexOf('[');
+      int cutIndex = -1;
+      if (lastDot > lastBracket)
+        cutIndex = lastDot;
+      else if (lastBracket > -1) cutIndex = lastBracket;
 
-       if (cutIndex <= 0) break;
+      if (cutIndex <= 0) break;
 
-       currentPath = currentPath.substring(0, cutIndex);
-       if (_scrollToKey(currentPath)) {
-         DebugLogger.log('✓ Scrolled to parent container: $currentPath', level: LogLevel.info);
-         return;
-       }
+      currentPath = currentPath.substring(0, cutIndex);
+      if (_scrollToKey(currentPath)) {
+        DebugLogger.log('✓ Scrolled to parent container: $currentPath',
+            level: LogLevel.info);
+        return;
+      }
     }
-    
+
     // 3. Last Resort: Scroll to Root
     if (_scrollToKey('')) {
-       DebugLogger.log('✓ Scrolled to Root', level: LogLevel.info);
-       return;
+      DebugLogger.log('✓ Scrolled to Root', level: LogLevel.info);
+      return;
     }
 
-    DebugLogger.log('❌ Could not scroll to target or any of its parents.', level: LogLevel.error);
-    _showSnackBar('Item expanded, but could not auto-scroll to it.', success: false);
+    DebugLogger.log('❌ Could not scroll to target or any of its parents.',
+        level: LogLevel.error);
+    _showSnackBar('Item expanded, but could not auto-scroll to it.',
+        success: false);
   }
 
   bool _scrollToKey(String path) {
@@ -2331,7 +2453,6 @@ class _EditorScreenState extends State<EditorScreen> {
     return false;
   }
 
-  
   Widget _buildDebugConsole() {
     final logs = DebugLogger.logs;
 
@@ -2343,7 +2464,8 @@ class _EditorScreenState extends State<EditorScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceVariant,
             border: Border(
-              bottom: BorderSide(color: Theme.of(context).dividerColor, width: 2),
+              bottom:
+                  BorderSide(color: Theme.of(context).dividerColor, width: 2),
             ),
           ),
           child: Row(
@@ -2416,7 +2538,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       Text(
                         'No logs yet',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                     ],
