@@ -1,15 +1,14 @@
 // lib/diff/diff_models.dart
 import 'package:flutter/foundation.dart';
-import '../nrbf/nrbf.dart';
 
 // ============================================================================
 // DIFF MODELS
 // ============================================================================
 
 enum ChangeType {
-  modified,  // Value changed
-  added,     // Field exists in 'after' but not in 'before'
-  removed,   // Field exists in 'before' but not in 'after'
+  modified, // Value changed
+  added, // Field exists in 'after' but not in 'before'
+  removed, // Field exists in 'before' but not in 'after'
 }
 
 @immutable

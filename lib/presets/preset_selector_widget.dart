@@ -1,6 +1,5 @@
 // lib/presets/preset_selector_widget.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../main.dart' show DebugLogger, LogLevel;
 import '../nrbf/nrbf.dart';
 import 'preset_models.dart';
@@ -93,7 +92,10 @@ class _PresetSelectorWidgetState extends State<PresetSelectorWidget> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant
+                      .withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -112,11 +114,12 @@ class _PresetSelectorWidgetState extends State<PresetSelectorWidget> {
                     Text(
                       '${widget.fieldPreset.entries.length} options',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // Search field
                     TextField(
                       controller: _searchController,
@@ -268,10 +271,13 @@ class _PresetSelectorWidgetState extends State<PresetSelectorWidget> {
     return Container(
       margin: const EdgeInsets.only(left: 0, top: 4, bottom: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
+        color: Theme.of(context)
+            .colorScheme
+            .primaryContainer
+            .withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -373,7 +379,9 @@ class _PresetSelectorWidgetState extends State<PresetSelectorWidget> {
                 border: const OutlineInputBorder(),
               ),
               autofocus: true,
-              maxLines: widget.fieldPreset.valueType == PresetValueType.guid ? 1 : null,
+              maxLines: widget.fieldPreset.valueType == PresetValueType.guid
+                  ? 1
+                  : null,
             ),
             if (widget.fieldPreset.valueType == PresetValueType.guid) ...[
               const SizedBox(height: 8),
@@ -394,7 +402,7 @@ class _PresetSelectorWidgetState extends State<PresetSelectorWidget> {
           FilledButton(
             onPressed: () {
               final newValue = controller.text.trim();
-              
+
               // Validate GUID format if needed
               if (widget.fieldPreset.valueType == PresetValueType.guid) {
                 final guidPattern = RegExp(
@@ -411,7 +419,7 @@ class _PresetSelectorWidgetState extends State<PresetSelectorWidget> {
                   return;
                 }
               }
-              
+
               widget.onValueChanged(newValue);
               Navigator.pop(context);
             },
@@ -421,7 +429,6 @@ class _PresetSelectorWidgetState extends State<PresetSelectorWidget> {
       ),
     );
   }
-
 }
 
 // ============================================================================
@@ -461,7 +468,7 @@ class _FavoriteToggleState extends State<FavoriteToggle> {
 
   void _toggleFavorite() {
     final isFavorite = PresetManager.instance.isFavorite(widget.path);
-    
+
     if (isFavorite) {
       PresetManager.instance.toggleFavorite(widget.path);
       PresetManager.instance.saveCurrentPreset();

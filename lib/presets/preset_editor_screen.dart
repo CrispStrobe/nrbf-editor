@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:typed_data';
 import 'dart:convert';
 import '../main.dart' show DebugLogger, LogLevel;
 import 'preset_models.dart';
@@ -193,14 +192,13 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
       itemCount: presets.length,
       itemBuilder: (context, index) {
         final preset = presets[index];
-        final isActive =
-            PresetManager.instance.activePreset?.gameTypeId == preset.gameTypeId;
+        final isActive = PresetManager.instance.activePreset?.gameTypeId ==
+            preset.gameTypeId;
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          color: isActive
-              ? Theme.of(context).colorScheme.primaryContainer
-              : null,
+          color:
+              isActive ? Theme.of(context).colorScheme.primaryContainer : null,
           child: ListTile(
             leading: Icon(
               Icons.games,
@@ -346,6 +344,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                 );
 
                 await PresetManager.instance.createPreset(newPreset);
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Preset created successfully', success: true);
               } catch (e) {
@@ -382,7 +381,8 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
 
   Future<void> _exportPreset(GamePreset preset) async {
     try {
-      final bytes = await PresetManager.instance.exportPreset(preset.gameTypeId);
+      final bytes =
+          await PresetManager.instance.exportPreset(preset.gameTypeId);
       final fileName = '${preset.gameTypeId}.json';
 
       if (kIsWeb) {
@@ -425,7 +425,8 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Preset'),
-        content: Text('Are you sure you want to delete "${preset.displayName}"?'),
+        content:
+            Text('Are you sure you want to delete "${preset.displayName}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -438,9 +439,11 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
             onPressed: () async {
               try {
                 await PresetManager.instance.deletePreset(preset.gameTypeId);
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Preset deleted', success: true);
               } catch (e) {
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Error deleting preset: $e', success: false);
               }
@@ -727,21 +730,25 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                   .toList();
 
               if (classFragments.isEmpty && libraryFragments.isEmpty) {
-                _showSnackBar('Please enter at least one fragment', success: false);
+                _showSnackBar('Please enter at least one fragment',
+                    success: false);
                 return;
               }
 
               try {
-                final hints = List<DetectionHint>.from(_selectedPreset!.detectionHints);
+                final hints =
+                    List<DetectionHint>.from(_selectedPreset!.detectionHints);
                 hints.add(DetectionHint(
                   classNameFragments: classFragments,
                   libraryNameFragments: libraryFragments,
                 ));
 
-                final updated = _selectedPreset!.copyWith(detectionHints: hints);
+                final updated =
+                    _selectedPreset!.copyWith(detectionHints: hints);
                 await PresetManager.instance.updatePreset(updated);
                 setState(() => _selectedPreset = updated);
 
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Detection hint added', success: true);
               } catch (e) {
@@ -864,7 +871,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<PathMatchMode>(
-                  value: matchMode,
+                  initialValue: matchMode,
                   decoration: const InputDecoration(
                     labelText: 'Match Mode',
                     border: OutlineInputBorder(),
@@ -883,7 +890,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<PresetValueType>(
-                  value: valueType,
+                  initialValue: valueType,
                   decoration: const InputDecoration(
                     labelText: 'Value Type',
                     border: OutlineInputBorder(),
@@ -939,10 +946,12 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                   );
                   setState(() => _selectedPreset = updated);
 
+                  if (!context.mounted) return;
                   Navigator.pop(context);
                   _showSnackBar('Field preset added', success: true);
                 } catch (e) {
-                  _showSnackBar('Error adding field preset: $e', success: false);
+                  _showSnackBar('Error adding field preset: $e',
+                      success: false);
                 }
               },
               child: const Text('Add'),
@@ -980,9 +989,11 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                 );
                 setState(() => _selectedPreset = updated);
 
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Field preset deleted', success: true);
               } catch (e) {
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Error deleting: $e', success: false);
               }
@@ -1057,13 +1068,15 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
               }
 
               try {
-                final favorites = List<FavoriteEntry>.from(_selectedPreset!.favorites);
+                final favorites =
+                    List<FavoriteEntry>.from(_selectedPreset!.favorites);
                 favorites.add(FavoriteEntry(path: path, label: label));
 
                 final updated = _selectedPreset!.copyWith(favorites: favorites);
                 await PresetManager.instance.updatePreset(updated);
                 setState(() => _selectedPreset = updated);
 
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Favorite added', success: true);
               } catch (e) {
@@ -1350,10 +1363,12 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                 );
 
                 // Reload
-                final reloadedPreset = PresetManager.instance.presets.firstWhere(
+                final reloadedPreset =
+                    PresetManager.instance.presets.firstWhere(
                   (p) => p.gameTypeId == _selectedPreset!.gameTypeId,
                 );
-                final reloadedFieldPreset = reloadedPreset.fieldPresets.firstWhere(
+                final reloadedFieldPreset =
+                    reloadedPreset.fieldPresets.firstWhere(
                   (fp) => fp.id == _selectedFieldPreset!.id,
                 );
 
@@ -1362,6 +1377,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                   _selectedFieldPreset = reloadedFieldPreset;
                 });
 
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Entry added', success: true);
               } catch (e) {
@@ -1446,10 +1462,12 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                 );
 
                 // Reload
-                final reloadedPreset = PresetManager.instance.presets.firstWhere(
+                final reloadedPreset =
+                    PresetManager.instance.presets.firstWhere(
                   (p) => p.gameTypeId == _selectedPreset!.gameTypeId,
                 );
-                final reloadedFieldPreset = reloadedPreset.fieldPresets.firstWhere(
+                final reloadedFieldPreset =
+                    reloadedPreset.fieldPresets.firstWhere(
                   (fp) => fp.id == _selectedFieldPreset!.id,
                 );
 
@@ -1458,6 +1476,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                   _selectedFieldPreset = reloadedFieldPreset;
                 });
 
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _showSnackBar('Entry updated', success: true);
               } catch (e) {
@@ -1517,7 +1536,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
       }
 
       final entries = List<PresetEntry>.from(_selectedFieldPreset!.entries);
-      
+
       for (final item in jsonData) {
         try {
           final entry = PresetEntry.fromJson(item as Map<String, dynamic>);
@@ -1529,7 +1548,8 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
             entries.add(entry);
           }
         } catch (e) {
-          DebugLogger.log('Skipping invalid entry: $e', level: LogLevel.warning);
+          DebugLogger.log('Skipping invalid entry: $e',
+              level: LogLevel.warning);
         }
       }
 
@@ -1561,7 +1581,8 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
 
   Future<void> _exportEntries() async {
     try {
-      final jsonData = _selectedFieldPreset!.entries.map((e) => e.toJson()).toList();
+      final jsonData =
+          _selectedFieldPreset!.entries.map((e) => e.toJson()).toList();
       final jsonString = const JsonEncoder.withIndent('  ').convert(jsonData);
       final bytes = Uint8List.fromList(utf8.encode(jsonString));
       final fileName = '${_selectedFieldPreset!.id}_entries.json';

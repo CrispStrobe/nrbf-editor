@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:typed_data';
 import '../main.dart' show DebugLogger, LogLevel;
 import '../nrbf/nrbf.dart';
 import '../presets/preset_manager.dart';
@@ -22,14 +21,12 @@ class DiffScreen extends StatefulWidget {
 }
 
 class _DiffScreenState extends State<DiffScreen> {
-  Uint8List? _beforeBytes;
-  Uint8List? _afterBytes;
   String? _beforeFileName;
   String? _afterFileName;
   NrbfRecord? _beforeRecord;
   NrbfRecord? _afterRecord;
   NrbfDecoder? _beforeDecoder;
-  NrbfDecoder? _afterDecoder; 
+  NrbfDecoder? _afterDecoder;
   DiffResult? _diffResult;
   bool _isLoading = false;
   String? _error;
@@ -53,7 +50,8 @@ class _DiffScreenState extends State<DiffScreen> {
       final bytes = result.files.first.bytes!;
       final fileName = result.files.first.name;
 
-      DebugLogger.log('Loading ${isBefore ? "BEFORE" : "AFTER"} file: $fileName',
+      DebugLogger.log(
+          'Loading ${isBefore ? "BEFORE" : "AFTER"} file: $fileName',
           level: LogLevel.info);
 
       // Decode NRBF
@@ -62,12 +60,10 @@ class _DiffScreenState extends State<DiffScreen> {
 
       setState(() {
         if (isBefore) {
-          _beforeBytes = bytes;
           _beforeFileName = fileName;
           _beforeRecord = record;
           _beforeDecoder = decoder;
         } else {
-          _afterBytes = bytes;
           _afterFileName = fileName;
           _afterRecord = record;
           _afterDecoder = decoder;
@@ -98,7 +94,7 @@ class _DiffScreenState extends State<DiffScreen> {
 
     try {
       DebugLogger.log('Running comparison...', level: LogLevel.info);
-      
+
       // Pass decoders for reference resolution
       final result = DiffEngine.compare(
         _beforeRecord!,
@@ -112,7 +108,8 @@ class _DiffScreenState extends State<DiffScreen> {
         _isLoading = false;
       });
 
-      _showSnackBar('Comparison complete: ${result.changes.length} changes found',
+      _showSnackBar(
+          'Comparison complete: ${result.changes.length} changes found',
           success: true);
     } catch (e, stackTrace) {
       DebugLogger.log('Error during comparison: $e', level: LogLevel.error);
@@ -127,8 +124,6 @@ class _DiffScreenState extends State<DiffScreen> {
 
   void _reset() {
     setState(() {
-      _beforeBytes = null;
-      _afterBytes = null;
       _beforeFileName = null;
       _afterFileName = null;
       _beforeRecord = null;
@@ -294,7 +289,7 @@ class _DiffScreenState extends State<DiffScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -380,17 +375,17 @@ class _DiffScreenState extends State<DiffScreen> {
                   Chip(
                     avatar: const Icon(Icons.edit, size: 16),
                     label: Text('Modified: ${_diffResult!.modifiedCount}'),
-                    backgroundColor: Colors.orange.withOpacity(0.2),
+                    backgroundColor: Colors.orange.withValues(alpha: 0.2),
                   ),
                   Chip(
                     avatar: const Icon(Icons.add, size: 16),
                     label: Text('Added: ${_diffResult!.addedCount}'),
-                    backgroundColor: Colors.green.withOpacity(0.2),
+                    backgroundColor: Colors.green.withValues(alpha: 0.2),
                   ),
                   Chip(
                     avatar: const Icon(Icons.remove, size: 16),
                     label: Text('Removed: ${_diffResult!.removedCount}'),
-                    backgroundColor: Colors.red.withOpacity(0.2),
+                    backgroundColor: Colors.red.withValues(alpha: 0.2),
                   ),
                 ],
               ),
@@ -402,7 +397,7 @@ class _DiffScreenState extends State<DiffScreen> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             border: Border(
               bottom: BorderSide(color: Theme.of(context).dividerColor),
             ),
@@ -581,13 +576,17 @@ class _DiffScreenState extends State<DiffScreen> {
               children: [
                 // Full values
                 if (change.changeType == ChangeType.modified) ...[
-                  _buildValueDisplay('Before', change.displayOldValue, Colors.red),
+                  _buildValueDisplay(
+                      'Before', change.displayOldValue, Colors.red),
                   const SizedBox(height: 12),
-                  _buildValueDisplay('After', change.displayNewValue, Colors.green),
+                  _buildValueDisplay(
+                      'After', change.displayNewValue, Colors.green),
                 ] else if (change.changeType == ChangeType.added)
-                  _buildValueDisplay('Value', change.displayNewValue, Colors.green)
+                  _buildValueDisplay(
+                      'Value', change.displayNewValue, Colors.green)
                 else
-                  _buildValueDisplay('Value', change.displayOldValue, Colors.red),
+                  _buildValueDisplay(
+                      'Value', change.displayOldValue, Colors.red),
 
                 const Divider(height: 24),
 
@@ -642,8 +641,8 @@ class _DiffScreenState extends State<DiffScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            border: Border.all(color: color.withOpacity(0.3)),
+            color: color.withValues(alpha: 0.1),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: SelectableText(
@@ -698,7 +697,8 @@ class _DiffScreenState extends State<DiffScreen> {
             onPressed: () {
               final label = labelController.text.trim();
               if (label.isNotEmpty) {
-                PresetManager.instance.toggleFavorite(change.path, label: label);
+                PresetManager.instance
+                    .toggleFavorite(change.path, label: label);
                 PresetManager.instance.saveCurrentPreset();
                 Navigator.pop(context);
                 _showSnackBar('Added to favorites', success: true);
@@ -837,7 +837,7 @@ class _QuickAddDialogState extends State<_QuickAddDialog> {
                 const Text('Select Field Preset:'),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<FieldPreset?>(
-                  value: _selectedFieldPreset,
+                  initialValue: _selectedFieldPreset,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     isDense: true,
@@ -900,7 +900,7 @@ class _QuickAddDialogState extends State<_QuickAddDialog> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<PathMatchMode>(
-                  value: _matchMode,
+                  initialValue: _matchMode,
                   decoration: const InputDecoration(
                     labelText: 'Match Mode',
                     border: OutlineInputBorder(),
@@ -918,7 +918,7 @@ class _QuickAddDialogState extends State<_QuickAddDialog> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<PresetValueType>(
-                  value: _valueType,
+                  initialValue: _valueType,
                   decoration: const InputDecoration(
                     labelText: 'Value Type',
                     border: OutlineInputBorder(),
@@ -975,7 +975,7 @@ class _QuickAddDialogState extends State<_QuickAddDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -1079,6 +1079,7 @@ class _QuickAddDialogState extends State<_QuickAddDialog> {
         entry,
       );
 
+      if (!mounted) return;
       Navigator.pop(context);
       _showSuccess('Added to preset successfully');
     } catch (e) {

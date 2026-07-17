@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-import 'dart:typed_data';
 import 'nrbf/nrbf.dart';
 import 'dart:convert';
 
@@ -47,8 +46,6 @@ class DebugLogger {
 
     _logs.add(entry);
     developer.log(message, name: 'NrbfEditor', level: level.value);
-    print(
-        '[${level.name.toUpperCase()}] ${entry.timestamp.toIso8601String()} - $message');
 
     // Notify listeners
     for (final listener in _listeners) {
@@ -507,8 +504,9 @@ class _EditorScreenState extends State<EditorScreen> {
 
     if (resolvedValue == null) return 'null';
     if (resolvedValue is String) return '"$resolvedValue"';
-    if (resolvedValue is bool || resolvedValue is num)
+    if (resolvedValue is bool || resolvedValue is num) {
       return resolvedValue.toString();
+    }
     if (resolvedValue is ClassRecord) {
       // AUTOMATICALLY RECONSTRUCT GUID!
       if (resolvedValue.typeName == 'System.Guid') {
@@ -520,8 +518,9 @@ class _EditorScreenState extends State<EditorScreen> {
       }
       return resolvedValue.typeName;
     }
-    if (resolvedValue is BinaryObjectStringRecord)
+    if (resolvedValue is BinaryObjectStringRecord) {
       return '"${resolvedValue.value}"';
+    }
     if (resolvedValue is MemberReferenceRecord) {
       return 'Reference(${resolvedValue.idRef}) [UNRESOLVED]';
     }
@@ -666,7 +665,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
       DebugLogger.log('✓ JSON exported successfully', level: LogLevel.info);
       _showSnackBar('Exported to JSON successfully', success: true);
-    } catch (e, stackTrace) {
+    } catch (e) {
       DebugLogger.log('ERROR exporting to JSON: $e', level: LogLevel.error);
       _showSnackBar('Failed to export JSON: $e', success: false);
     }
@@ -1071,7 +1070,7 @@ class _EditorScreenState extends State<EditorScreen> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         border: Border(
           bottom: BorderSide(color: Theme.of(context).dividerColor),
         ),
@@ -1307,7 +1306,7 @@ class _EditorScreenState extends State<EditorScreen> {
           Icon(
             Icons.file_upload_outlined,
             size: 120,
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 24),
           Text(
@@ -1421,7 +1420,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 ? Theme.of(context)
                     .colorScheme
                     .primaryContainer
-                    .withOpacity(0.2)
+                    .withValues(alpha: 0.2)
                 : null,
             borderRadius: BorderRadius.circular(8),
           ),
@@ -1447,7 +1446,10 @@ class _EditorScreenState extends State<EditorScreen> {
       key: key,
       margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
       color: matchesSearch
-          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+          ? Theme.of(context)
+              .colorScheme
+              .primaryContainer
+              .withValues(alpha: 0.3)
           : null,
       child: ExpansionTile(
         key: Key('${nodePath}_$isExpanded'),
@@ -1547,7 +1549,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   ? Theme.of(context)
                       .colorScheme
                       .primaryContainer
-                      .withOpacity(0.2)
+                      .withValues(alpha: 0.2)
                   : null,
               borderRadius: BorderRadius.circular(8),
             ),
@@ -1592,7 +1594,10 @@ class _EditorScreenState extends State<EditorScreen> {
         key: key,
         margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
         color: matchesSearch
-            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+            ? Theme.of(context)
+                .colorScheme
+                .primaryContainer
+                .withValues(alpha: 0.3)
             : null,
         child: ExpansionTile(
           key: Key('${nodePath}_$isExpanded'),
@@ -1747,7 +1752,10 @@ class _EditorScreenState extends State<EditorScreen> {
       key: key,
       margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
       color: matchesSearch
-          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+          ? Theme.of(context)
+              .colorScheme
+              .primaryContainer
+              .withValues(alpha: 0.3)
           : null,
       child: ExpansionTile(
         key: Key('${nodePath}_$isExpanded'),
@@ -1848,7 +1856,10 @@ class _EditorScreenState extends State<EditorScreen> {
       margin: EdgeInsets.only(left: depth * 16.0, top: 4, bottom: 4),
       decoration: BoxDecoration(
         color: matchesSearch
-            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2)
+            ? Theme.of(context)
+                .colorScheme
+                .primaryContainer
+                .withValues(alpha: 0.2)
             : null,
         borderRadius: BorderRadius.circular(8),
       ),
@@ -1878,7 +1889,7 @@ class _EditorScreenState extends State<EditorScreen> {
   // for arrays at root level
   Widget _buildArrayRecordTile(dynamic record, String path, int depth) {
     final nodePath = path;
-    final key = _nodeKeys.putIfAbsent(path, () => GlobalKey());
+    _nodeKeys.putIfAbsent(path, () => GlobalKey());
     final isExpanded = _expandedNodes[nodePath] ?? false;
     final array = record.getArray() as List;
 
@@ -1924,9 +1935,10 @@ class _EditorScreenState extends State<EditorScreen> {
     final resolved = _resolveValue(value);
 
     if (resolved is String) return const Icon(Icons.text_fields, size: 20);
-    if (resolved is bool)
+    if (resolved is bool) {
       return Icon(resolved ? Icons.check_box : Icons.check_box_outline_blank,
           size: 20);
+    }
     if (resolved is num) return const Icon(Icons.numbers, size: 20);
     if (resolved == null) return const Icon(Icons.block, size: 20);
     if (resolved is ClassRecord && resolved.typeName == 'System.Guid') {
@@ -1979,7 +1991,7 @@ class _EditorScreenState extends State<EditorScreen> {
             if (isBool)
               SwitchListTile(
                 title: const Text('Value'),
-                value: currentValue as bool,
+                value: currentValue,
                 onChanged: (value) {
                   DebugLogger.log('Setting $memberName = $value',
                       level: LogLevel.info);
@@ -2057,7 +2069,7 @@ class _EditorScreenState extends State<EditorScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             border: Border(
               bottom: BorderSide(color: Theme.of(context).dividerColor),
             ),
@@ -2131,7 +2143,7 @@ class _EditorScreenState extends State<EditorScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             border: Border(
               bottom: BorderSide(color: Theme.of(context).dividerColor),
             ),
@@ -2236,7 +2248,7 @@ class _EditorScreenState extends State<EditorScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             border: Border(
               bottom: BorderSide(color: Theme.of(context).dividerColor),
             ),
@@ -2413,9 +2425,11 @@ class _EditorScreenState extends State<EditorScreen> {
       final lastDot = currentPath.lastIndexOf('.');
       final lastBracket = currentPath.lastIndexOf('[');
       int cutIndex = -1;
-      if (lastDot > lastBracket)
+      if (lastDot > lastBracket) {
         cutIndex = lastDot;
-      else if (lastBracket > -1) cutIndex = lastBracket;
+      } else if (lastBracket > -1) {
+        cutIndex = lastBracket;
+      }
 
       if (cutIndex <= 0) break;
 
@@ -2462,7 +2476,7 @@ class _EditorScreenState extends State<EditorScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             border: Border(
               bottom:
                   BorderSide(color: Theme.of(context).dividerColor, width: 2),
