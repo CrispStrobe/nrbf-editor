@@ -754,6 +754,12 @@ class NrbfDecoder {
   final List<NrbfRecord> _allRecordsInOrder = []; // Track all records
   final bool verbose;
 
+  // Recursion-depth guard state (see [_decodeNext]). Every nested record is
+  // decoded through _decodeNext, so a chain of nested class/array records
+  // recurses once per level; an unbounded chain overflows the stack.
+  static const int _maxRecordDepth = 512;
+  int _depth = 0;
+
   NrbfDecoder(Uint8List bytes, {this.verbose = false})
       : _reader = BinaryReader(bytes);
 
@@ -829,6 +835,26 @@ class NrbfDecoder {
 
   // Resolve references during member reading
   NrbfRecord _decodeNext() {
+    // Nested class/array records recurse through here once per nesting level.
+    // A crafted deep chain (~5000 levels, ~65 KB) overflowed the stack, leaking
+    // a StackOverflowError — an Error the app's `on Exception` decode guard
+    // can't catch, so a hostile file crashed the app (a decode-bomb DoS). Bound
+    // the depth and reject cleanly with a catchable Exception instead.
+    _depth++;
+    try {
+      // GUARD:maxdepth >>>
+      if (_depth > _maxRecordDepth) {
+        throw Exception(
+            'Record nesting too deep (> $_maxRecordDepth) — malformed or hostile NRBF stream');
+      }
+      // GUARD:maxdepth <<<
+      return _decodeNextBody();
+    } finally {
+      _depth--;
+    }
+  }
+
+  NrbfRecord _decodeNextBody() {
     final pos = _reader.position;
     final recordTypeByte = _reader.readByte();
 

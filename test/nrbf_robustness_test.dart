@@ -109,4 +109,41 @@ void main() {
       );
     }
   });
+
+  test(
+      'a deeply-nested class-record chain rejects cleanly, not a StackOverflow (DoS)',
+      () {
+    // 100000 nested SystemClassWithMembers records: each record's single member
+    // value is the next record, so the decoder recurses once per nesting level.
+    // Unbounded, this chain overflowed the stack with a StackOverflowError — an
+    // Error the app's `on Exception` decode guard can't catch, crashing the app
+    // (a decode-bomb DoS). It must reject fast with a catchable Exception. The
+    // depth cap short-circuits after 512 levels, so this stays fast regardless
+    // of the byte count.
+    Uint8List i32(int v) =>
+        Uint8List(4)..buffer.asByteData().setInt32(0, v, Endian.little);
+    final bytes = <int>[
+      0x00, ...i32(1), ...i32(0), ...i32(1), ...i32(0), // header
+    ];
+    for (var i = 0; i < 100000; i++) {
+      // SystemClassWithMembers: objectId, name "A", memberCount 1, member "m".
+      bytes.addAll([0x02, ...i32(i + 2), 0x01, 0x41, ...i32(1), 0x01, 0x6D]);
+    }
+    bytes.addAll([0x0A, 0x0B]); // innermost ObjectNull, then MessageEnd
+
+    final sw = Stopwatch()..start();
+    Object? caught;
+    try {
+      NrbfDecoder(Uint8List.fromList(bytes)).decode();
+    } catch (e) {
+      caught = e;
+    }
+    expect(sw.elapsedMilliseconds, lessThan(2000),
+        reason: 'must reject fast, not recurse through the whole chain');
+    expect(caught, isA<Exception>(),
+        reason: 'deep nesting must reject with a catchable Exception');
+    expect(caught, isNot(isA<StackOverflowError>()));
+    expect(caught, isNot(isA<Error>()),
+        reason: 'must not leak a raw Error (RangeError / StackOverflow)');
+  });
 }
